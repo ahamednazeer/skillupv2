@@ -74,6 +74,7 @@ const ProjectSubmissions = () => {
     const [finalPaymentModal, setFinalPaymentModal] = useState(false);
     const [uploadModal, setUploadModal] = useState(false);
     const [reportModal, setReportModal] = useState(false);
+    const [viewRequirementModal, setViewRequirementModal] = useState(false);
 
     // Forms state
     const [requirementForm, setRequirementForm] = useState({ projectType: "other", collegeGuidelines: "", notes: "" });
@@ -274,6 +275,7 @@ const ProjectSubmissions = () => {
     const handleOpenFinal = (assignment: any) => { setSelectedAssignment(assignment); setFinalPaymentModal(true); };
     const handleOpenUpload = (assignment: any) => { setSelectedAssignment(assignment); setUploadModal(true); };
     const handleOpenViewFiles = (assignment: any) => { setSelectedAssignment(assignment); setViewFilesModal(true); };
+    const handleOpenViewRequirement = (assignment: any) => { setSelectedAssignment(assignment); setViewRequirementModal(true); };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -427,6 +429,9 @@ const ProjectSubmissions = () => {
                                                 <Button size="small" variant="text" onClick={() => resendEmailMutation.mutate(item._id)} disabled={resendEmailMutation.isPending} sx={{ ...textLinkStyle }}>
                                                     Resend Requirement Email
                                                 </Button>
+                                                <Button size="small" variant="outlined" onClick={() => handleOpenViewRequirement(item)} startIcon={<MdVisibility />} sx={{ ...smallPrimaryButton, bgcolor: "transparent", color: "var(--webprimary)" }}>
+                                                    View Requirements
+                                                </Button>
                                             </Box>
                                         )}
                                         {item.status === "advance-payment-pending" && (
@@ -436,6 +441,9 @@ const ProjectSubmissions = () => {
                                                 </Button>
                                                 <Button size="small" variant="text" onClick={() => resendEmailMutation.mutate(item._id)} disabled={resendEmailMutation.isPending} sx={{ ...textLinkStyle }}>
                                                     Resend Payment Email
+                                                </Button>
+                                                <Button size="small" variant="text" onClick={() => handleOpenViewRequirement(item)} sx={{ ...textLinkStyle }}>
+                                                    View Requirements
                                                 </Button>
                                             </Box>
                                         )}
@@ -447,6 +455,9 @@ const ProjectSubmissions = () => {
                                                 <Button size="small" variant="text" onClick={() => resendEmailMutation.mutate(item._id)} disabled={resendEmailMutation.isPending} sx={{ ...textLinkStyle }}>
                                                     Resend Progress Email
                                                 </Button>
+                                                <Button size="small" variant="text" onClick={() => handleOpenViewRequirement(item)} sx={{ ...textLinkStyle }}>
+                                                    View Requirements
+                                                </Button>
                                             </Box>
                                         )}
                                         {item.status === "ready-for-demo" && (
@@ -457,6 +468,9 @@ const ProjectSubmissions = () => {
                                                 <Button size="small" variant="text" onClick={() => resendEmailMutation.mutate(item._id)} disabled={resendEmailMutation.isPending} sx={{ ...textLinkStyle }}>
                                                     Resend Demo Email
                                                 </Button>
+                                                <Button size="small" variant="text" onClick={() => handleOpenViewRequirement(item)} sx={{ ...textLinkStyle }}>
+                                                    View Requirements
+                                                </Button>
                                             </Box>
                                         )}
                                         {item.status === "final-payment-pending" && (
@@ -466,6 +480,9 @@ const ProjectSubmissions = () => {
                                                 </Button>
                                                 <Button size="small" variant="text" onClick={() => resendEmailMutation.mutate(item._id)} disabled={resendEmailMutation.isPending} sx={{ ...textLinkStyle }}>
                                                     Resend Payment Email
+                                                </Button>
+                                                <Button size="small" variant="text" onClick={() => handleOpenViewRequirement(item)} sx={{ ...textLinkStyle }}>
+                                                    View Requirements
                                                 </Button>
                                             </Box>
                                         )}
@@ -521,6 +538,74 @@ const ProjectSubmissions = () => {
                     </TableBody>
                 </Table>
             </TableContainer>
+
+
+
+            {/* View Requirement Modal */}
+            <Dialog open={viewRequirementModal} onClose={() => setViewRequirementModal(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>Student Requirements</DialogTitle>
+                <DialogContent>
+                    {selectedAssignment?.requirementSubmission ? (
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+                            <Paper variant="outlined" sx={{ p: 2, bgcolor: "#f8fafc" }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", fontWeight: "bold" }}>Project Topic</Typography>
+                                <Typography variant="body1" fontWeight="600">{selectedAssignment.requirementSubmission.topic}</Typography>
+                            </Paper>
+
+                            <Box sx={{ display: "flex", gap: 2 }}>
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography variant="caption" color="text.secondary">Type</Typography>
+                                    <Chip label={selectedAssignment.requirementSubmission.projectType} size="small" sx={{ ml: 1 }} />
+                                </Box>
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography variant="caption" color="text.secondary">Submitted At</Typography>
+                                    <Typography variant="body2">{new Date(selectedAssignment.requirementSubmission.submittedAt).toLocaleDateString()}</Typography>
+                                </Box>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">College Guidelines</Typography>
+                                <Typography variant="body2" sx={{ p: 1, bgcolor: "#f1f5f9", borderRadius: 1 }}>
+                                    {selectedAssignment.requirementSubmission.collegeGuidelines || "None provided"}
+                                </Typography>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">Additional Notes</Typography>
+                                <Typography variant="body2" sx={{ p: 1, bgcolor: "#f1f5f9", borderRadius: 1 }}>
+                                    {selectedAssignment.requirementSubmission.notes || "None"}
+                                </Typography>
+                            </Box>
+
+                            {selectedAssignment.requirementSubmission.attachments?.length > 0 && (
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>Attached Files</Typography>
+                                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                                        {selectedAssignment.requirementSubmission.attachments.map((file: any, idx: number) => (
+                                            <Button
+                                                key={idx}
+                                                variant="outlined"
+                                                size="small"
+                                                startIcon={<MdDownload />}
+                                                href={file.filePath.startsWith("http") ? file.filePath : `${import.meta.env.VITE_APP_BASE_URL}/${file.filePath}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                {file.fileName}
+                                            </Button>
+                                        ))}
+                                    </Box>
+                                </Box>
+                            )}
+                        </Box>
+                    ) : (
+                        <Alert severity="warning">No requirements submitted yet.</Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setViewRequirementModal(false)}>Close</Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Requirement Modal */}
             <Dialog open={requirementModal} onClose={() => setRequirementModal(false)} maxWidth="sm" fullWidth>
@@ -648,7 +733,7 @@ const ProjectSubmissions = () => {
                     <Button onClick={() => setViewFilesModal(false)}>Close</Button>
                 </DialogActions>
             </Dialog>
-        </Box>
+        </Box >
     );
 };
 

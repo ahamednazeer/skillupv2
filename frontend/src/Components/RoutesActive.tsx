@@ -1,5 +1,5 @@
-export const UsersRoutes = ["/users"];
-export const CoursesRoutes = ["/courses"];
+export const UsersRoutes = ["/users", "/employees"];
+export const ProgramsRoutes = ["/courses", "/projects", "/internships", "/submissions", "/project-submissions"];
 export const OffersRoutes = ["/offers"];
 export const CategoryRoutes = ["/category"];
 export const SyllabusRoutes = ["/syllabus"];
@@ -7,3 +7,4 @@ export const CarreerRoutes = ["/admincareers"];
 export const CertificateRoutes = ["/certificate"];
 export const DashboardRoutes = ["/dashboard"];
 export const PaymentRoutes = ["/payment-settings", "/payment-management"];
+export const PayrollRoutes = ["/payroll/generate", "/payroll/history", "/payroll/settings"];

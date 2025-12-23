@@ -12,7 +12,7 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    const name = path.parse(file.originalname).name.replace(/\s+/g, "-"); 
+    const name = path.parse(file.originalname).name.replace(/\s+/g, "-");
     const ext = path.extname(file.originalname);
     const timestamp = Date.now();
     cb(null, `${name}-${timestamp}${ext}`);
@@ -33,7 +33,7 @@ const fileFilter = (req, file, cb) => {
 
 const uploadPdf = multer({
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for PDFs
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
   fileFilter: fileFilter
 });
 

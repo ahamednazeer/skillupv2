@@ -226,7 +226,7 @@ const WebItServices = () => {
                   fontSize: "24px",
                 }}
               >
-                👥
+
               </Box>
               <Typography
                 variant="h6"

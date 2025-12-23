@@ -38,7 +38,7 @@ exports.register = async (req, res) => {
 
     otpStore.set(email, { name, email, mobile, otp, expiresAt });
 
-    console.log("Generated OTP:", otp);
+    // OTP sent - not logged for security
     await sendOtpEmail(email, otp);
 
     res.status(200).json({ message: "OTP sent to your email" });
@@ -76,23 +76,114 @@ exports.verifyOtp = async (req, res) => {
   res.status(201).json({ message: "User registered and password sent to email" });
 };
 
+// Failed login attempt tracking (in-memory, keyed by email)
+const failedLoginAttempts = new Map();
+const LOCKOUT_THRESHOLD = 5;
+const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+
+// Helper to check if account is locked
+const isAccountLocked = (email) => {
+  const attempts = failedLoginAttempts.get(email);
+  if (!attempts) return false;
+
+  if (attempts.count >= LOCKOUT_THRESHOLD) {
+    const lockoutEnds = attempts.lastAttempt + LOCKOUT_DURATION;
+    if (Date.now() < lockoutEnds) {
+      return true;
+    }
+    // Lockout expired, reset attempts
+    failedLoginAttempts.delete(email);
+  }
+  return false;
+};
+
+// Record failed login attempt
+const recordFailedAttempt = (email) => {
+  const attempts = failedLoginAttempts.get(email) || { count: 0, lastAttempt: 0 };
+  attempts.count += 1;
+  attempts.lastAttempt = Date.now();
+  failedLoginAttempts.set(email, attempts);
+  return attempts.count;
+};
+
+// Clear failed attempts on successful login
+const clearFailedAttempts = (email) => {
+  failedLoginAttempts.delete(email);
+};
+
 exports.login = async (req, res) => {
   const { email, password } = req.body;
 
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password are required" });
+  }
+
   try {
+    // Check if account is locked
+    if (isAccountLocked(email)) {
+      console.warn(`[Security] Locked account login attempt: ${email}`);
+      return res.status(429).json({
+        message: "Account temporarily locked due to too many failed attempts. Please try again after 15 minutes."
+      });
+    }
+
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid Credentials" });
+
+    // Use same error message for invalid email/password to prevent enumeration
+    if (!user) {
+      recordFailedAttempt(email);
+      console.warn(`[Security] Failed login - unknown email: ${email}`);
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid Credentials" });
+    if (!isMatch) {
+      const attemptCount = recordFailedAttempt(email);
+      console.warn(`[Security] Failed login attempt ${attemptCount}/${LOCKOUT_THRESHOLD} for: ${email}`);
 
-    const token = jwt.sign({ email: user.email, name: user.name, id: user._id, role: user.role }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
+      if (attemptCount >= LOCKOUT_THRESHOLD) {
+        return res.status(429).json({
+          message: "Account temporarily locked due to too many failed attempts. Please try again after 15 minutes."
+        });
+      }
 
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    // Successful login - clear failed attempts
+    clearFailedAttempts(email);
+
+    // Generate access token (15 minutes)
+    const accessToken = jwt.sign(
+      { email: user.email, name: user.name, id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    // Generate refresh token (7 days)
+    const refreshToken = crypto.randomBytes(64).toString('hex');
+    const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    // Store refresh token in database
+    const RefreshToken = require("../models/RefreshToken");
+    await RefreshToken.create({
+      token: refreshToken,
+      userId: user._id,
+      userAgent: req.headers['user-agent'] || '',
+      ipAddress: req.ip || req.connection?.remoteAddress || '',
+      expiresAt: refreshTokenExpiry
     });
-    res.json({ token: token, user: { name: user.name, email: user.email, role: user.role, status: user.status } });
+
+    console.log(`[Auth] Successful login: ${email}`);
+    res.json({
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      expiresIn: 900, // 15 minutes in seconds
+      user: { name: user.name, email: user.email, role: user.role, status: user.status }
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(`[Auth] Login error for ${email}:`, err.message);
+    res.status(500).json({ message: "An error occurred during login" });
   }
 };
 
@@ -147,8 +238,7 @@ exports.forgotPassword = async (req, res) => {
     // Generate reset token (encrypt the email with timestamp for security)
     const resetData = `${email}-${Date.now()}`;
     const resetToken = Buffer.from(resetData).toString('base64');
-    console.log("Generated token data:", resetData);
-    console.log("Generated token:", resetToken);
+    // Token generated - not logged for security
 
     // Set expiry time (15 minutes from now)
     const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes

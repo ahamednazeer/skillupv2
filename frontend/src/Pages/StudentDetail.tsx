@@ -25,7 +25,7 @@ import {
     TableHead,
     TableRow,
 } from "@mui/material";
-import { MdArrowBack, MdAdd, MdDelete, MdEmail, MdUpload } from "react-icons/md";
+import { MdArrowBack, MdAdd, MdDelete, MdEmail } from "react-icons/md";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Cookies from "js-cookie";
@@ -87,12 +87,6 @@ const StudentDetail = () => {
 
     const [assignMode, setAssignMode] = useState<"create" | "existing">("create");
     const [selectedItemId, setSelectedItemId] = useState("");
-
-    // Course Upload State
-    const [uploadCourseModalOpen, setUploadCourseModalOpen] = useState(false);
-    const [uploadCourseId, setUploadCourseId] = useState("");
-    const [uploadFile, setUploadFile] = useState<File | null>(null);
-    const [uploadNotes, setUploadNotes] = useState("");
 
     // Fetch all courses
     const { data: allCourses } = useQuery({
@@ -249,29 +243,6 @@ const StudentDetail = () => {
         },
     });
 
-    const uploadCourseSubmissionMutation = useMutation({
-        mutationFn: async () => {
-            const formData = new FormData();
-            if (uploadFile) formData.append("file", uploadFile);
-            formData.append("notes", uploadNotes);
-
-            const response = await axios.post(
-                `${import.meta.env.VITE_APP_BASE_URL}admin/course-assignments/${uploadCourseId}/upload-submission`,
-                formData,
-                { headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" } }
-            );
-            return response.data;
-        },
-        onSuccess: () => {
-            CustomSnackBar.successSnackbar("Document uploaded successfully!");
-            queryClient.invalidateQueries({ queryKey: ["student-assignments", id] });
-            handleCloseUploadModal();
-        },
-        onError: (error: any) => {
-            CustomSnackBar.errorSnackbar(error.response?.data?.message || "Failed to upload document");
-        }
-    });
-
     const handleCloseModal = () => {
         setAssignModalOpen(false);
         setCourseForm(defaultCourseForm);
@@ -281,17 +252,7 @@ const StudentDetail = () => {
         setSelectedItemId("");
     };
 
-    const handleCloseUploadModal = () => {
-        setUploadCourseModalOpen(false);
-        setUploadCourseId("");
-        setUploadFile(null);
-        setUploadNotes("");
-    };
 
-    const handleOpenUploadModal = (assignmentId: string) => {
-        setUploadCourseId(assignmentId);
-        setUploadCourseModalOpen(true);
-    };
 
     const handleSubmit = () => {
         if (assignMode === "existing") {
@@ -444,7 +405,7 @@ const StudentDetail = () => {
                                     <TableCell>{a.itemId?.trainer || "N/A"}</TableCell>
                                     <TableCell><Chip label={a.itemId?.status || a.status} size="small" /></TableCell>
                                     <TableCell>
-                                        <IconButton size="small" onClick={() => handleOpenUploadModal(a._id)} color="primary"><MdUpload /></IconButton><IconButton size="small" onClick={() => removeAssignmentMutation.mutate(a._id)} sx={{ color: "error.main" }}><MdDelete /></IconButton>
+                                        <IconButton size="small" onClick={() => removeAssignmentMutation.mutate(a._id)} sx={{ color: "error.main" }}><MdDelete /></IconButton>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -480,7 +441,7 @@ const StudentDetail = () => {
                                     <TableCell>{a.itemId?.duration || "N/A"}</TableCell>
                                     <TableCell><Chip label={a.itemId?.status || a.status} size="small" /></TableCell>
                                     <TableCell>
-                                        <IconButton size="small" onClick={() => handleOpenUploadModal(a._id)} color="primary"><MdUpload /></IconButton><IconButton size="small" onClick={() => removeAssignmentMutation.mutate(a._id)} sx={{ color: "error.main" }}><MdDelete /></IconButton>
+                                        <IconButton size="small" onClick={() => removeAssignmentMutation.mutate(a._id)} sx={{ color: "error.main" }}><MdDelete /></IconButton>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -516,7 +477,7 @@ const StudentDetail = () => {
                                     <TableCell>{a.itemId?.projectType || "N/A"}</TableCell>
                                     <TableCell><Chip label={a.itemId?.status || a.status} size="small" /></TableCell>
                                     <TableCell>
-                                        <IconButton size="small" onClick={() => handleOpenUploadModal(a._id)} color="primary"><MdUpload /></IconButton><IconButton size="small" onClick={() => removeAssignmentMutation.mutate(a._id)} sx={{ color: "error.main" }}><MdDelete /></IconButton>
+                                        <IconButton size="small" onClick={() => removeAssignmentMutation.mutate(a._id)} sx={{ color: "error.main" }}><MdDelete /></IconButton>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -524,40 +485,6 @@ const StudentDetail = () => {
                     </Table>
                 </TabPanel>
             </Card>
-
-            {/* Upload Course Document Modal */}
-            <Dialog open={uploadCourseModalOpen} onClose={handleCloseUploadModal} maxWidth="sm" fullWidth>
-                <DialogTitle>Upload Course Document</DialogTitle>
-                <DialogContent>
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                        Upload a document for the student (e.g., certificate, additional material).
-                    </Alert>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <Button variant="outlined" component="label" startIcon={<MdUpload />} fullWidth>
-                            {uploadFile ? uploadFile.name : "Select File"}
-                            <input type="file" hidden onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)} />
-                        </Button>
-                        <TextField
-                            label="Notes / Description"
-                            multiline
-                            rows={3}
-                            value={uploadNotes}
-                            onChange={(e) => setUploadNotes(e.target.value)}
-                            fullWidth
-                        />
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseUploadModal}>Cancel</Button>
-                    <Button
-                        variant="contained"
-                        onClick={() => uploadCourseSubmissionMutation.mutate()}
-                        disabled={!uploadFile || uploadCourseSubmissionMutation.isPending}
-                    >
-                        {uploadCourseSubmissionMutation.isPending ? "Uploading..." : "Upload"}
-                    </Button>
-                </DialogActions>
-            </Dialog>
 
             {/* Add Course/Internship/Project Modal */}
             <Dialog open={assignModalOpen} onClose={handleCloseModal} maxWidth="md" fullWidth>

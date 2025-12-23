@@ -732,4 +732,210 @@ router.post("/internship-assignments/:id/complete", upload.single("certificate")
     }
 });
 
+// ===== PAYMENT MANAGEMENT ROUTES =====
+
+// Get all pending payments across all assignment types
+router.get("/pending-payments", async (req, res) => {
+    try {
+        const { status, itemType } = req.query;
+
+        const query = {
+            "payment.required": true
+        };
+
+        // Filter by payment status
+        if (status === "pending") {
+            query["payment.status"] = "pending";
+        } else if (status === "paid") {
+            query["payment.status"] = "paid";
+        } else if (status === "proof-uploaded") {
+            query["payment.status"] = "pending";
+            query["payment.proofFile"] = { $exists: true, $ne: null };
+        } else {
+            // Default: show all pending payments
+            query["payment.status"] = "pending";
+        }
+
+        // Filter by item type
+        if (itemType && ["course", "project", "internship"].includes(itemType)) {
+            query.itemType = itemType;
+        }
+
+        const assignments = await StudentAssignment.find(query)
+            .populate("student", "name email mobile")
+            .populate("itemId", "name title")
+            .sort({ "payment.proofUploadedAt": -1, assignedAt: -1 });
+
+        // Format response with invoice-like structure
+        const payments = assignments.map(a => ({
+            _id: a._id,
+            invoiceId: `INV-${new Date(a.assignedAt).getFullYear()}-${a._id.toString().slice(-6).toUpperCase()}`,
+            student: a.student,
+            itemType: a.itemType,
+            itemName: a.itemId?.name || a.itemId?.title || "Unknown",
+            amount: a.payment?.amount || 0,
+            paymentMethod: a.payment?.paymentMethod || null,
+            status: a.payment?.status,
+            proofFile: a.payment?.proofFile || null,
+            proofUploadedAt: a.payment?.proofUploadedAt || null,
+            transactionId: a.payment?.transactionId || null,
+            paidAt: a.payment?.paidAt || null,
+            notes: a.payment?.notes || "",
+            assignedAt: a.assignedAt,
+            assignmentStatus: a.status,
+            invoice: a.invoice || null
+        }));
+
+        res.status(200).json(payments);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Mark any assignment as paid (universal payment update)
+router.put("/assignments/:id/mark-paid", async (req, res) => {
+    try {
+        const { transactionId, notes } = req.body;
+
+        const assignment = await StudentAssignment.findById(req.params.id)
+            .populate("student", "name email")
+            .populate("itemId", "name title");
+
+        if (!assignment) {
+            return res.status(404).json({ message: "Assignment not found" });
+        }
+
+        if (assignment.payment?.status !== "pending") {
+            return res.status(400).json({ message: "Payment is not pending for this assignment" });
+        }
+
+        // Update payment status
+        assignment.payment.status = "paid";
+        assignment.payment.paidAt = new Date();
+        if (transactionId) {
+            assignment.payment.transactionId = transactionId;
+        }
+        if (notes) {
+            assignment.payment.notes = notes;
+        }
+
+        // Update assignment status based on type
+        if (assignment.itemType === "course") {
+            if (assignment.status === "advance-payment-pending") {
+                assignment.status = "in-progress";
+            }
+        } else if (assignment.itemType === "project") {
+            if (assignment.status === "advance-payment-pending") {
+                assignment.status = "in-progress";
+            } else if (assignment.status === "final-payment-pending") {
+                assignment.status = "ready-for-download";
+            }
+        } else if (assignment.itemType === "internship") {
+            if (assignment.status === "advance-payment-pending") {
+                assignment.status = "in-progress";
+            }
+        }
+
+        await assignment.save();
+
+        // Send confirmation email
+        const itemName = assignment.itemId?.name || assignment.itemId?.title || "Item";
+        const itemType = assignment.itemType.charAt(0).toUpperCase() + assignment.itemType.slice(1);
+
+        try {
+            if (assignment.itemType === "course") {
+                await sendCourseMail("PAYMENT_RECEIVED", {
+                    email: assignment.student.email,
+                    name: assignment.student.name
+                }, {
+                    courseName: itemName,
+                    amount: assignment.payment.amount,
+                    transactionId: transactionId || "VERIFIED"
+                });
+            } else {
+                await sendProjectEmail("PAYMENT_CONFIRMATION", {
+                    email: assignment.student.email,
+                    name: assignment.student.name
+                }, {
+                    projectTitle: itemName
+                });
+            }
+        } catch (emailErr) {
+            console.error("Failed to send payment confirmation email:", emailErr);
+        }
+
+        res.status(200).json({
+            message: `Payment marked as paid for ${itemType}: ${itemName}`,
+            assignment
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// ===== INVOICE GENERATION =====
+const generateInvoicePDF = require("../utils/generateInvoicePDF");
+
+// Generate invoice for any assignment
+router.post("/assignments/:id/generate-invoice", async (req, res) => {
+    try {
+        const assignment = await StudentAssignment.findById(req.params.id)
+            .populate("student", "name email")
+            .populate("itemId", "name title");
+
+        if (!assignment) {
+            return res.status(404).json({ message: "Assignment not found" });
+        }
+
+        // Check if payment exists and is paid
+        if (!assignment.payment?.amount) {
+            return res.status(400).json({ message: "No payment found for this assignment" });
+        }
+
+        // Generate invoice number
+        const invoiceNumber = `INV-${new Date().getFullYear()}-${assignment._id.toString().slice(-6).toUpperCase()}`;
+
+        // Prepare invoice data
+        const invoiceData = {
+            invoiceNumber,
+            studentName: assignment.student?.name || "Student",
+            studentEmail: assignment.student?.email || "",
+            itemType: assignment.itemType,
+            itemName: assignment.itemId?.name || assignment.itemId?.title || "Item",
+            itemDescription: `${assignment.itemType.charAt(0).toUpperCase() + assignment.itemType.slice(1)} Assignment`,
+            amount: assignment.payment?.amount || 0,
+            paymentStatus: assignment.payment?.status || "pending",
+            paymentMethod: assignment.payment?.paymentMethod || null,
+            transactionId: assignment.payment?.transactionId || null,
+            paidAt: assignment.payment?.paidAt || null
+        };
+
+        // Generate PDF
+        const pdfBuffer = await generateInvoicePDF(invoiceData);
+
+        // Upload to B2
+        const fileName = `Invoice_${invoiceNumber.replace(/\//g, "-")}_${Date.now()}.pdf`;
+        const uploadResult = await b2Service.uploadFile(pdfBuffer, fileName, "invoices");
+
+        // Save invoice to assignment
+        assignment.invoice = {
+            url: uploadResult.url,
+            invoiceNumber: invoiceNumber,
+            generatedAt: new Date(),
+            generatedBy: req.user.id
+        };
+
+        await assignment.save();
+
+        res.status(200).json({
+            message: "Invoice generated successfully",
+            invoice: assignment.invoice
+        });
+    } catch (err) {
+        console.error("Generate Invoice Error:", err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = router;
+

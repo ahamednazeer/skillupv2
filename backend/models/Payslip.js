@@ -8,6 +8,7 @@ const payslipSchema = new mongoose.Schema({
     },
     month: { type: String, required: true }, // e.g., "January", "01"
     year: { type: Number, required: true }, // e.g., 2024
+    attendanceDays: { type: Number, default: 30 }, // Days present
 
     // Snapshot of values at generation time
     basic: { type: Number, default: 0 },

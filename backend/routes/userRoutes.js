@@ -3,6 +3,8 @@ const router = express.Router();
 const { register, login, verifyOtp, changePassword, forgotPassword, resetPassword } = require("../controllers/userController");
 const auth = require("../middleware/auth");
 const User = require("../models/User");
+const { loginLimiter, forgotPasswordLimiter } = require("../middleware/rateLimit");
+
 /**
  * @swagger
  * /api/register:
@@ -12,7 +14,7 @@ const User = require("../models/User");
  *        - User
  */
 router.post("/register", register);
-router.post("/login", login);
+router.post("/login", loginLimiter, login);
 router.post("/verify-otp", verifyOtp);
 router.post("/user/change-password", changePassword);
 
@@ -56,7 +58,7 @@ router.post("/user/change-password", changePassword);
  *       500:
  *         description: Server error
  */
-router.post("/forgot-password", forgotPassword);
+router.post("/forgot-password", forgotPasswordLimiter, forgotPassword);
 
 // Reset Password API
 /**
@@ -123,4 +125,108 @@ router.delete("/user/:id", auth, async (req, res) => {
   res.json({ msg: "User deleted" });
 });
 
+// ===== Token Management Endpoints =====
+
+const jwt = require("jsonwebtoken");
+const RefreshToken = require("../models/RefreshToken");
+const TokenBlacklist = require("../models/TokenBlacklist");
+
+/**
+ * @swagger
+ * /api/refresh-token:
+ *   post:
+ *     summary: Exchange refresh token for new access token
+ *     tags:
+ *        - Auth
+ */
+router.post("/refresh-token", async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(400).json({ message: "Refresh token is required" });
+  }
+
+  try {
+    // Find valid refresh token
+    const tokenDoc = await RefreshToken.findOne({
+      token: refreshToken,
+      isRevoked: false,
+      expiresAt: { $gt: new Date() }
+    }).populate("userId");
+
+    if (!tokenDoc) {
+      return res.status(401).json({ message: "Invalid or expired refresh token" });
+    }
+
+    const user = tokenDoc.userId;
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    // Generate new access token
+    const accessToken = jwt.sign(
+      { email: user.email, name: user.name, id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    console.log(`[Auth] Token refreshed for: ${user.email}`);
+    res.json({
+      accessToken: accessToken,
+      expiresIn: 900, // 15 minutes in seconds
+      user: { name: user.name, email: user.email, role: user.role, status: user.status }
+    });
+  } catch (err) {
+    console.error("[Auth] Refresh token error:", err.message);
+    res.status(500).json({ message: "An error occurred" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/logout:
+ *   post:
+ *     summary: Logout user and invalidate tokens
+ *     tags:
+ *        - Auth
+ */
+router.post("/logout", auth, async (req, res) => {
+  const { refreshToken } = req.body;
+  const accessToken = req.header("Authorization")?.replace("Bearer ", "");
+
+  try {
+    // Revoke refresh token if provided
+    if (refreshToken) {
+      await RefreshToken.updateOne(
+        { token: refreshToken },
+        { isRevoked: true }
+      );
+    }
+
+    // Blacklist current access token
+    if (accessToken && req.user) {
+      // Decode token to get expiry time
+      const decoded = jwt.decode(accessToken);
+      if (decoded && decoded.exp) {
+        await TokenBlacklist.create({
+          token: accessToken,
+          userId: req.user.id,
+          reason: "logout",
+          expiresAt: new Date(decoded.exp * 1000)
+        });
+      }
+    }
+
+    // Optionally: Revoke all refresh tokens for this user
+    // await RefreshToken.updateMany({ userId: req.user.id }, { isRevoked: true });
+
+    console.log(`[Auth] User logged out: ${req.user?.email}`);
+    res.json({ message: "Logged out successfully" });
+  } catch (err) {
+    console.error("[Auth] Logout error:", err.message);
+    res.status(500).json({ message: "An error occurred during logout" });
+  }
+});
+
 module.exports = router;
+

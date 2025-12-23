@@ -57,8 +57,8 @@ exports.generatePayslip = async (req, res) => {
             {
                 ...employee.toObject(),
                 name: employee.user.name, // Ensure user name is accessible
-                designation: employee.designation
-                // Add other fields needed for PDF
+                designation: employee.designation,
+                attendanceDays: attendanceDays || 30
             },
             {
                 month, year,
@@ -88,6 +88,7 @@ exports.generatePayslip = async (req, res) => {
             existingPayslip.netPay = netPay;
             existingPayslip.basic = basic;
             existingPayslip.hra = hra;
+            existingPayslip.attendanceDays = attendanceDays || 30;
             existingPayslip.allowances = finalEarnings.filter(e => !["Basic Pay", "HRA"].includes(e.name)); // Store extras
             existingPayslip.deductions = finalDeductions;
             existingPayslip.pdfUrl = uploadResult.url; // Or uploadResult.fileName for internal ref? 
@@ -102,6 +103,7 @@ exports.generatePayslip = async (req, res) => {
             const newPayslip = new Payslip({
                 employee: employeeProfileId,
                 month, year,
+                attendanceDays: attendanceDays || 30,
                 basic, hra,
                 allowances: finalEarnings.filter(e => !["Basic Pay", "HRA"].includes(e.name)),
                 deductions: finalDeductions,
@@ -166,7 +168,12 @@ exports.sendPayslipEmail = async (req, res) => {
             // Get Settings
             let payrollSettings = await PayrollSettings.findOne();
             fileBuffer = await generatePayslipPDF(
-                { ...payslip.employee.toObject(), name: payslip.employee.user.name, designation: payslip.employee.designation },
+                {
+                    ...payslip.employee.toObject(),
+                    name: payslip.employee.user.name,
+                    designation: payslip.employee.designation,
+                    attendanceDays: payslip.attendanceDays || 30
+                },
                 {
                     month: payslip.month, year: payslip.year,
                     earnings: earnings,
@@ -267,18 +274,18 @@ exports.updateSettings = async (req, res) => {
 exports.downloadPayslip = async (req, res) => {
     try {
         const { id } = req.params; // Payslip ID
-        
+
         console.log("Download request received for payslip:", id);
         console.log("Auth header:", req.header("Authorization"));
         console.log("User:", req.user);
-        
+
         const payslip = await Payslip.findById(id)
             .populate("employee")
             .populate({
                 path: "employee",
                 populate: { path: "user" }
             });
-        
+
         if (!payslip) {
             return res.status(404).json({ message: "Payslip not found" });
         }
@@ -288,7 +295,7 @@ exports.downloadPayslip = async (req, res) => {
             // Fetch the file from B2 and stream it
             const axios = require("axios");
             const response = await axios.get(payslip.pdfUrl, { responseType: 'arraybuffer' });
-            
+
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="payslip_${payslip.employee.employeeId}_${payslip.month}_${payslip.year}.pdf"`);
             res.send(response.data);

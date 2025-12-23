@@ -17,13 +17,8 @@ import {
     DialogActions,
     Rating,
     IconButton,
-    Accordion,
-    AccordionSummary,
-    AccordionDetails,
-    List,
-    ListItem,
-    ListItemIcon,
-    ListItemText,
+    Divider,
+    Stack,
     Stepper,
     Step,
     StepLabel,
@@ -31,9 +26,26 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Cookies from "js-cookie";
-import { MdExpandMore, MdDownload, MdDescription, MdCode, MdPictureAsPdf, MdVideoLibrary, MdCheck, MdSchedule, MdPayment, MdCloudDownload } from "react-icons/md";
+import {
+    MdDownload,
+    MdDescription,
+    MdCode,
+    MdPictureAsPdf,
+    MdVideoLibrary,
+    MdCheck,
+    MdPayment,
+    MdCloudDownload,
+    MdUpload,
+    MdAssignment,
+    MdAccessTime,
+    MdPerson,
+    MdCalendarToday,
+    MdCheckCircle,
+} from "react-icons/md";
+import { IoClose } from "react-icons/io5";
 import CustomSnackBar from "../../Custom/CustomSnackBar";
-import { submitButtonStyle, smallPrimaryButton, cancelButtonStyle, textLinkStyle } from "../../assets/Styles/ButtonStyles";
+import { primaryButtonStyle, outlinedButtonStyle, dangerButtonStyle } from "../../assets/Styles/ButtonStyles";
+import { useUploadPaymentProof, useGetPaymentSettings } from "../../Hooks/payment";
 
 const projectTypeOptions = [
     { value: "website", label: "Website Development" },
@@ -50,16 +62,15 @@ const projectTypeOptions = [
 const steps = [
     { label: "Assigned", value: "assigned" },
     { label: "Requirements", value: "requirement-submitted" },
-    { label: "Advance Payment", value: "advance-payment-pending" },
-    { label: "Work In Progress", value: "in-progress" },
-    { label: "Ready for Demo", value: "ready-for-demo" },
-    { label: "Final Payment", value: "final-payment-pending" },
-    { label: "Project Files", value: "ready-for-download" },
+    { label: "Advance Pay", value: "advance-payment-pending" },
+    { label: "In Progress", value: "in-progress" },
+    { label: "Demo", value: "ready-for-demo" },
+    { label: "Final Pay", value: "final-payment-pending" },
+    { label: "Download", value: "ready-for-download" },
     { label: "Delivered", value: "delivered" }
 ];
 
 const getActiveStep = (status: string) => {
-    // Map status to step index
     switch (status) {
         case "assigned": return 0;
         case "requirement-submitted": case "requirement-submitted-admin": return 1;
@@ -68,38 +79,71 @@ const getActiveStep = (status: string) => {
         case "ready-for-demo": return 4;
         case "final-payment-pending": return 5;
         case "ready-for-download": return 6;
-        case "delivered": case "completed": return 8; // All done
+        case "delivered": case "completed": return 8;
         default: return 0;
     }
 };
 
 const getFileIcon = (fileType: string) => {
-    const style = { fontSize: 24 };
+    const style = { fontSize: 20 };
     switch (fileType) {
         case "ppt": return <MdDescription style={{ ...style, color: "#f97316" }} />;
         case "source-code": return <MdCode style={{ ...style, color: "#10b981" }} />;
         case "report": case "documentation": return <MdPictureAsPdf style={{ ...style, color: "#ef4444" }} />;
         case "video": return <MdVideoLibrary style={{ ...style, color: "#6366f1" }} />;
-        default: return <MdDescription style={{ ...style, color: "#3b82f6" }} />;
+        default: return <MdDescription style={{ ...style, color: "var(--webprimary)" }} />;
     }
+};
+
+const getStatusBadge = (assignment: any) => {
+    const status = assignment.status;
+
+    if (status === "delivered" || status === "completed") {
+        return { label: "Delivered", color: "#22c55e", bg: "#f0fdf4" };
+    }
+    if (status === "ready-for-download") {
+        return { label: "Ready to Download", color: "#3b82f6", bg: "#eff6ff" };
+    }
+    if (status === "final-payment-pending" || status === "advance-payment-pending") {
+        if (assignment.payment?.proofFile) {
+            return { label: "Payment Verifying", color: "#f59e0b", bg: "#fffbeb" };
+        }
+        return { label: "Payment Required", color: "#ef4444", bg: "#fef2f2" };
+    }
+    if (status === "in-progress") {
+        return { label: "In Progress", color: "var(--webprimary)", bg: "#eff6ff" };
+    }
+    if (status === "ready-for-demo") {
+        return { label: "Demo Ready", color: "#8b5cf6", bg: "#f5f3ff" };
+    }
+    if (status === "requirement-submitted" || status === "requirement-submitted-admin") {
+        return { label: "Requirements Submitted", color: "#06b6d4", bg: "#ecfeff" };
+    }
+    return { label: "Assigned", color: "#8b5cf6", bg: "#f5f3ff" };
 };
 
 const MyProjects = () => {
     const token = Cookies.get("skToken");
     const queryClient = useQueryClient();
+    const location = useLocation();
 
-    // State for modals
     const [selectedProject, setSelectedProject] = useState<any>(null);
     const [requirementModal, setRequirementModal] = useState(false);
     const [feedbackModal, setFeedbackModal] = useState(false);
+    const [paymentProofModal, setPaymentProofModal] = useState(false);
 
-    // Form states
     const [requirementForm, setRequirementForm] = useState({
         projectType: "other", collegeGuidelines: "", notes: ""
     });
     const [feedbackForm, setFeedbackForm] = useState({ rating: 0, comments: "" });
+    const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState("");
+    const [transactionId, setTransactionId] = useState("");
+    const [requirementFiles, setRequirementFiles] = useState<File[]>([]);
 
-    // Fetch all projects
+    const paymentProofMutation = useUploadPaymentProof();
+    const { data: paymentSettings } = useGetPaymentSettings();
+
     const { data, isLoading, error } = useQuery({
         queryKey: ["my-projects"],
         queryFn: async () => {
@@ -111,51 +155,54 @@ const MyProjects = () => {
         },
     });
 
-    // Deep Linking: Scroll to specific project if projectId is in URL
-    const location = useLocation();
-
+    // Deep Linking
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const projectId = params.get("projectId");
-
         if (projectId && data && !isLoading) {
-            // Slight delay to ensure rendering
             setTimeout(() => {
                 const element = document.getElementById(projectId);
                 if (element) {
                     element.scrollIntoView({ behavior: "smooth", block: "center" });
-                    // Optional: temporary highlight
-                    element.style.border = "2px solid #f57f17";
-                    setTimeout(() => {
-                        element.style.border = "1px solid #e5e7eb";
-                    }, 3000);
+                    element.style.border = "2px solid var(--webprimary)";
+                    setTimeout(() => { element.style.border = "1px solid #e0e0e0"; }, 3000);
                 }
             }, 500);
         }
     }, [data, isLoading, location.search]);
 
-    // Submit requirement mutation
+    // Mutations
     const submitRequirementMutation = useMutation({
         mutationFn: async (assignmentId: string) => {
+            const formData = new FormData();
+            formData.append("topic", selectedProject?.itemId?.title || "Project");
+            formData.append("projectType", requirementForm.projectType);
+            formData.append("collegeGuidelines", requirementForm.collegeGuidelines);
+            formData.append("notes", requirementForm.notes);
+
+            if (requirementFiles && requirementFiles.length > 0) {
+                Array.from(requirementFiles).forEach((file) => {
+                    formData.append("files", file);
+                });
+            }
+
             const response = await axios.post(
                 `${import.meta.env.VITE_APP_BASE_URL}student/projects/${assignmentId}/submit-requirement`,
-                { ...requirementForm, topic: selectedProject?.itemId?.title || selectedProject?.itemId?.name || "Project Submission" },
-                { headers: { Authorization: `Bearer ${token}` } }
+                formData,
+                { headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" } }
             );
             return response.data;
         },
         onSuccess: () => {
-            CustomSnackBar.successSnackbar("Requirement submitted successfully!");
+            CustomSnackBar.successSnackbar("Requirement submitted!");
             queryClient.invalidateQueries({ queryKey: ["my-projects"] });
             setRequirementModal(false);
             setRequirementForm({ projectType: "other", collegeGuidelines: "", notes: "" });
+            setRequirementFiles([]);
         },
-        onError: (err: any) => {
-            CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed to submit");
-        },
+        onError: (err: any) => CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed"),
     });
 
-    // Mark delivered mutation
     const markDeliveredMutation = useMutation({
         mutationFn: async (assignmentId: string) => {
             const response = await axios.post(
@@ -166,15 +213,12 @@ const MyProjects = () => {
             return response.data;
         },
         onSuccess: () => {
-            CustomSnackBar.successSnackbar("Thank you! Project marked as delivered.");
+            CustomSnackBar.successSnackbar("Project marked as delivered!");
             queryClient.invalidateQueries({ queryKey: ["my-projects"] });
         },
-        onError: (err: any) => {
-            CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed to mark delivered");
-        },
+        onError: (err: any) => CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed"),
     });
 
-    // Submit feedback mutation
     const submitFeedbackMutation = useMutation({
         mutationFn: async (assignmentId: string) => {
             const response = await axios.post(
@@ -190,29 +234,13 @@ const MyProjects = () => {
             setFeedbackModal(false);
             setFeedbackForm({ rating: 0, comments: "" });
         },
-        onError: (err: any) => {
-            CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed to submit feedback");
-        },
+        onError: (err: any) => CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed"),
     });
 
-    const handleOpenRequirement = (project: any) => {
-        setSelectedProject(project);
-        setRequirementModal(true);
-    };
-
-    const handleOpenFeedback = (project: any) => {
-        setSelectedProject(project);
-        setFeedbackModal(true);
-    };
-
-    const handleDownloadFile = (filePath: string, fileName: string) => {
-        const url = filePath.startsWith("http")
-            ? filePath
-            : `${import.meta.env.VITE_APP_BASE_URL}${filePath}`;
-
+    const handleDownload = (path: string, filename: string) => {
         const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName; // Note: for cross-origin URLs, download attribute may be ignored by browser
+        link.href = path.startsWith("http") ? path : `${import.meta.env.VITE_APP_BASE_URL}/${path}`;
+        link.setAttribute("download", filename);
         link.target = "_blank";
         document.body.appendChild(link);
         link.click();
@@ -221,259 +249,572 @@ const MyProjects = () => {
 
     if (isLoading) {
         return (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-                <CircularProgress />
+            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+                <CircularProgress sx={{ color: "var(--webprimary)" }} />
             </Box>
         );
     }
 
     if (error) {
-        return <Alert severity="error">Failed to load projects.</Alert>;
+        return (
+            <Box sx={{ p: 3 }}>
+                <Alert severity="error">Failed to load projects. Please try again.</Alert>
+            </Box>
+        );
     }
 
     return (
-        <Box sx={{ p: { xs: 2, md: 3 } }}>
-            <Typography variant="h5" fontWeight="bold" sx={{ mb: 3 }}>
-                🚀 My Projects
-            </Typography>
+        <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1000, mx: "auto" }}>
+            {/* Page Header */}
+            <Box sx={{ mb: 4 }}>
+                <Typography
+                    variant="h4"
+                    fontWeight="bold"
+                    gutterBottom
+                    sx={{
+                        fontFamily: "SemiBold_W",
+                        fontSize: "24px",
+                        color: "var(--title)",
+                        "@media (max-width: 768px)": { fontSize: "22px" },
+                    }}
+                >
+                    My Projects
+                </Typography>
+                <Typography sx={{ fontFamily: "Regular_W", fontSize: "14px", color: "var(--greyText)" }}>
+                    Track your project progress from requirements to delivery
+                </Typography>
+            </Box>
 
             {!data || data.length === 0 ? (
-                <Alert severity="info">No projects assigned yet. Contact admin to get started!</Alert>
+                <Card sx={{ border: "1px solid #e0e0e0", borderRadius: "10px", p: 6, textAlign: "center" }}>
+                    <MdAssignment size={48} color="var(--greyText)" />
+                    <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "18px", mt: 2, mb: 1 }}>
+                        No projects yet!
+                    </Typography>
+                    <Typography sx={{ fontFamily: "Regular_W", fontSize: "14px", color: "var(--greyText)" }}>
+                        Contact admin to get a project assigned.
+                    </Typography>
+                </Card>
             ) : (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     {data.map((assignment: any) => {
                         const project = assignment.itemId;
+                        const statusBadge = getStatusBadge(assignment);
                         const activeStep = getActiveStep(assignment.status);
-                        const canSubmitRequirement = assignment.status === "assigned";
-                        const canDownload = ["ready-for-download", "delivered", "completed"].includes(assignment.status);
-                        const canGiveFeedback = ["delivered", "completed"].includes(assignment.status) && !assignment.feedback?.submittedAt;
-                        const requirementSubmitted = assignment.requirementSubmission?.submittedAt;
+                        const isDelivered = assignment.status === "delivered" || assignment.status === "completed";
+                        const needsRequirement = assignment.status === "assigned";
+                        const needsPayment = (assignment.status === "advance-payment-pending" || assignment.status === "final-payment-pending") && !assignment.payment?.proofFile;
+                        const paymentVerifying = (assignment.status === "advance-payment-pending" || assignment.status === "final-payment-pending") && assignment.payment?.proofFile;
+                        const readyToDownload = assignment.status === "ready-for-download";
 
                         return (
-                            <Card key={assignment._id} id={assignment.itemId?._id || assignment._id} sx={{ borderRadius: 3, border: "1px solid #e5e7eb", overflow: "visible" }}>
+                            <Card
+                                key={assignment._id}
+                                id={assignment._id}
+                                sx={{ border: "1px solid #e0e0e0", borderRadius: "10px", overflow: "hidden" }}
+                            >
+                                {/* Header */}
                                 <CardContent sx={{ p: 3 }}>
-                                    {/* Header */}
-                                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "start", flexWrap: "wrap", gap: 2, mb: 2 }}>
+                                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 2 }}>
                                         <Box>
-                                            <Typography variant="h6" fontWeight="600">{project?.title || project?.name || "Project"}</Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                Assigned: {new Date(assignment.assignedAt).toLocaleDateString()}
+                                            <Chip
+                                                label={statusBadge.label}
+                                                size="small"
+                                                sx={{
+                                                    fontFamily: "Medium_W",
+                                                    fontSize: "11px",
+                                                    bgcolor: statusBadge.bg,
+                                                    color: statusBadge.color,
+                                                    border: `1px solid ${statusBadge.color}`,
+                                                    fontWeight: 600,
+                                                    mb: 1
+                                                }}
+                                            />
+                                            <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "18px", color: "var(--title)" }}>
+                                                {project?.title || "Untitled Project"}
                                             </Typography>
+                                            <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mt: 1 }}>
+                                                {project?.mentor && (
+                                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "var(--greyText)" }}>
+                                                        <MdPerson size={14} />
+                                                        <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px" }}>{project.mentor}</Typography>
+                                                    </Box>
+                                                )}
+                                                {project?.deadline && (
+                                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "var(--greyText)" }}>
+                                                        <MdCalendarToday size={14} />
+                                                        <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px" }}>
+                                                            Due {new Date(project.deadline).toLocaleDateString()}
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </Stack>
                                         </Box>
-                                        <Chip label={steps[Math.min(activeStep, steps.length - 1)].label} color={activeStep >= 7 ? "success" : "primary"} size="small" />
                                     </Box>
 
-                                    {/* Project Details */}
-                                    <Box sx={{ mb: 3, p: 2, bgcolor: "#f8fafc", borderRadius: 2 }}>
-                                        <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1 }}>Project Details</Typography>
-                                        {project?.description && (
-                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{project.description}</Typography>
-                                        )}
-                                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 1 }}>
-                                            {project?.deadline && <Typography variant="caption">📅 Deadline: {new Date(project.deadline).toLocaleDateString()}</Typography>}
-                                            {project?.mentor && <Typography variant="caption">👨‍🏫 Mentor: {project.mentor}</Typography>}
-                                            {project?.projectType && <Typography variant="caption">📂 Type: {project.projectType}</Typography>}
-                                        </Box>
-                                        {project?.requirements && (
-                                            <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
-                                                <strong>Requirements:</strong> {project.requirements}
-                                            </Typography>
-                                        )}
-                                    </Box>
-
-                                    {/* PROGRESS STEPPER */}
-                                    <Box sx={{ mb: 4, width: '100%', overflowX: 'auto' }}>
-                                        <Stepper activeStep={activeStep} alternativeLabel>
-                                            {steps.map((step) => (
-                                                <Step key={step.label}>
-                                                    <StepLabel>{step.label}</StepLabel>
+                                    {/* Stepper */}
+                                    <Box sx={{ mt: 3, overflowX: "auto" }}>
+                                        <Stepper activeStep={activeStep} alternativeLabel sx={{ minWidth: 600 }}>
+                                            {steps.map((step, idx) => (
+                                                <Step key={step.value} completed={idx < activeStep}>
+                                                    <StepLabel sx={{
+                                                        "& .MuiStepLabel-label": {
+                                                            fontFamily: "Regular_W",
+                                                            fontSize: "10px"
+                                                        }
+                                                    }}>
+                                                        {step.label}
+                                                    </StepLabel>
                                                 </Step>
                                             ))}
                                         </Stepper>
                                     </Box>
+                                </CardContent>
 
-                                    {/* Action Areas */}
+                                <Divider />
 
-                                    {/* 1. Submitted Requirements (Read Only) */}
-                                    {requirementSubmitted && (
-                                        <Accordion sx={{ mb: 2, border: "1px solid #e5e7eb", borderRadius: 2, "&:before": { display: "none" } }}>
-                                            <AccordionSummary expandIcon={<MdExpandMore />}>
-                                                <Typography variant="subtitle2" fontWeight="600" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                                    ✅ Requirements Submitted
-                                                    {assignment.requirementSubmission.submittedByRole === "admin" && (
-                                                        <Chip label="By Admin" size="small" color="default" sx={{ ml: 1, height: 20, fontSize: 10 }} />
-                                                    )}
-                                                </Typography>
-                                            </AccordionSummary>
-                                            <AccordionDetails>
-                                                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                                                    <Typography variant="body2"><strong>Topic:</strong> {assignment.requirementSubmission.topic}</Typography>
-                                                    <Typography variant="body2"><strong>Type:</strong> {assignment.requirementSubmission.projectType}</Typography>
-                                                    {assignment.requirementSubmission.collegeGuidelines && (
-                                                        <Typography variant="body2"><strong>Guidelines:</strong> {assignment.requirementSubmission.collegeGuidelines}</Typography>
-                                                    )}
-                                                    {assignment.requirementSubmission.notes && (
-                                                        <Typography variant="body2"><strong>Notes:</strong> {assignment.requirementSubmission.notes}</Typography>
-                                                    )}
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        Date: {new Date(assignment.requirementSubmission.submittedAt).toLocaleString()}
-                                                    </Typography>
-                                                </Box>
-                                            </AccordionDetails>
-                                        </Accordion>
-                                    )}
-
-                                    {/* 2. Submit Requirements (Action) */}
-                                    {canSubmitRequirement && (
-                                        <Box sx={{ mb: 2, p: 2, bgcolor: "#fff7ed", border: "1px solid #fdba74", borderRadius: 2 }}>
-                                            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1 }}>
-                                                📝 Action Required: Submit Requirements
+                                {/* Action Section */}
+                                <Box sx={{ p: 3 }}>
+                                    {/* NEEDS REQUIREMENT */}
+                                    {needsRequirement && (
+                                        <Box sx={{ p: 3, bgcolor: "#f5f3ff", borderRadius: "8px", border: "1px solid #c4b5fd" }}>
+                                            <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "16px", color: "#7c3aed", mb: 1 }}>
+                                                Submit Your Requirements
                                             </Typography>
-                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                                Please submit your project details to proceed.
+                                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px", color: "var(--greyText)", mb: 2 }}>
+                                                Tell us about your project needs to get started.
                                             </Typography>
-                                            <Button variant="contained" onClick={() => handleOpenRequirement(assignment)} sx={{ ...submitButtonStyle }}>
-                                                Submit Requirement
+                                            <Button
+                                                variant="contained"
+                                                startIcon={<MdAssignment />}
+                                                onClick={() => { setSelectedProject(assignment); setRequirementModal(true); }}
+                                                sx={{ ...primaryButtonStyle }}
+                                            >
+                                                Submit Requirements
                                             </Button>
                                         </Box>
                                     )}
 
-                                    {/* 2. Advance Payment */}
-                                    {assignment.status === "advance-payment-pending" && (
-                                        <Alert severity="warning" sx={{ mb: 2 }} icon={<MdPayment fontSize="inherit" />}>
-                                            <Typography variant="subtitle2" fontWeight="bold">Advance Payment Required</Typography>
-                                            <Typography variant="body2">
-                                                An advance payment of <strong>₹{assignment.payment?.amount || "N/A"}</strong> is required to start the work.
-                                            </Typography>
-                                            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                                                Please contact admin to complete the payment.
-                                            </Typography>
-                                            {assignment.payment?.notes && <Typography variant="caption" display="block">Note: {assignment.payment.notes}</Typography>}
-                                        </Alert>
+                                    {/* NEEDS PAYMENT */}
+                                    {needsPayment && (
+                                        <Box sx={{ p: 3, bgcolor: "#fef2f2", borderRadius: "8px", border: "1px solid #fecaca" }}>
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                                                <MdPayment color="#ef4444" size={20} />
+                                                <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "16px", color: "#dc2626" }}>
+                                                    {assignment.status === "advance-payment-pending" ? "Advance" : "Final"} Payment Required
+                                                </Typography>
+                                            </Box>
+
+                                            <Box sx={{ p: 2, bgcolor: "white", borderRadius: "6px", mb: 2 }}>
+                                                <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px", color: "var(--greyText)" }}>Amount</Typography>
+                                                <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "24px", color: "#dc2626" }}>
+                                                    ₹{assignment.payment?.amount || 0}
+                                                </Typography>
+                                            </Box>
+
+                                            {paymentSettings && (
+                                                <Box sx={{ mb: 2, p: 2, bgcolor: "white", borderRadius: "6px" }}>
+                                                    <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "13px", mb: 1 }}>Payment Options:</Typography>
+                                                    {paymentSettings.enableBankTransfer && (
+                                                        <Box sx={{ mb: 1 }}>
+                                                            <Typography sx={{ fontFamily: "Medium_W", fontSize: "11px", color: "var(--greyText)", textTransform: "uppercase" }}>Bank</Typography>
+                                                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px" }}>
+                                                                {paymentSettings.bankDetails?.accountHolderName} | A/C: {paymentSettings.bankDetails?.accountNumber}
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
+                                                    {paymentSettings.enableUPI && (
+                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                                                            <Box>
+                                                                <Typography sx={{ fontFamily: "Medium_W", fontSize: "11px", color: "var(--greyText)", textTransform: "uppercase" }}>UPI</Typography>
+                                                                <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px" }}>{paymentSettings.upiId}</Typography>
+                                                            </Box>
+                                                            {paymentSettings.qrUrl && (
+                                                                <Box component="img" src={paymentSettings.qrUrl} alt="QR" sx={{ width: 60, borderRadius: "4px" }} />
+                                                            )}
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            )}
+
+                                            <Button
+                                                variant="contained"
+                                                fullWidth
+                                                startIcon={<MdUpload />}
+                                                onClick={() => { setSelectedProject(assignment); setPaymentProofModal(true); }}
+                                                sx={{ ...dangerButtonStyle, py: 1.2 }}
+                                            >
+                                                Upload Payment Screenshot
+                                            </Button>
+                                        </Box>
                                     )}
 
-                                    {/* 3. In Progress */}
-                                    {assignment.status === "in-progress" && (
-                                        <Alert severity="info" sx={{ mb: 2 }} icon={<MdSchedule fontSize="inherit" />}>
-                                            <Typography variant="subtitle2" fontWeight="bold">Work In Progress</Typography>
-                                            <Typography variant="body2">
-                                                Our team is currently working on your project. We'll update you when it's ready for a demo.
+                                    {/* PAYMENT VERIFYING */}
+                                    {paymentVerifying && (
+                                        <Box sx={{ p: 3, bgcolor: "#fffbeb", borderRadius: "8px", border: "1px solid #fcd34d", textAlign: "center" }}>
+                                            <MdAccessTime size={32} color="#f59e0b" />
+                                            <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "16px", color: "#d97706", mt: 1 }}>
+                                                Payment Under Review
                                             </Typography>
-                                        </Alert>
+                                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px", color: "var(--greyText)" }}>
+                                                Admin will verify your payment soon.
+                                            </Typography>
+                                        </Box>
                                     )}
 
-                                    {/* 4. Ready for Demo */}
-                                    {assignment.status === "ready-for-demo" && (
-                                        <Alert severity="success" sx={{ mb: 2 }} icon={<MdCheck fontSize="inherit" />}>
-                                            <Typography variant="subtitle2" fontWeight="bold">Ready for Demo!</Typography>
-                                            <Typography variant="body2">
-                                                Your project is ready for a demo. Please check with your admin/mentor to schedule it.
+                                    {/* IN PROGRESS / DEMO / REQ SUBMITTED */}
+                                    {(assignment.status === "in-progress" || assignment.status === "ready-for-demo" || assignment.status === "requirement-submitted" || assignment.status === "requirement-submitted-admin") && (
+                                        <Box sx={{ p: 3, bgcolor: "#eff6ff", borderRadius: "8px", border: "1px solid #93c5fd", textAlign: "center" }}>
+                                            <MdAccessTime size={32} color="var(--webprimary)" />
+                                            <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "16px", color: "var(--webprimary)", mt: 1 }}>
+                                                {assignment.status === "in-progress" ? "Work in Progress" :
+                                                    assignment.status === "ready-for-demo" ? "Demo Ready - Contact Admin" :
+                                                        "Requirements Received"}
                                             </Typography>
-                                        </Alert>
+                                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px", color: "var(--greyText)" }}>
+                                                We're working on your project. You'll be notified of updates.
+                                            </Typography>
+                                        </Box>
                                     )}
 
-                                    {/* 5. Final Payment */}
-                                    {assignment.status === "final-payment-pending" && (
-                                        <Alert severity="warning" sx={{ mb: 2 }} icon={<MdPayment fontSize="inherit" />}>
-                                            <Typography variant="subtitle2" fontWeight="bold">Final Payment Required</Typography>
-                                            <Typography variant="body2">
-                                                Please complete the final payment of <strong>₹{assignment.payment?.amount || "N/A"}</strong> to receive your delivery files.
-                                            </Typography>
-                                        </Alert>
+                                    {/* READY TO DOWNLOAD */}
+                                    {readyToDownload && (
+                                        <Box sx={{ p: 3, bgcolor: "#f0fdf4", borderRadius: "8px", border: "1px solid #86efac" }}>
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                                                <MdCloudDownload color="#22c55e" size={20} />
+                                                <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "16px", color: "#16a34a" }}>
+                                                    Your Project Files are Ready!
+                                                </Typography>
+                                            </Box>
+
+                                            {assignment.deliveryFiles?.length > 0 && (
+                                                <Stack spacing={1} sx={{ mb: 2 }}>
+                                                    {assignment.deliveryFiles.map((file: any, idx: number) => (
+                                                        <Box
+                                                            key={idx}
+                                                            sx={{
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                gap: 2,
+                                                                p: 1.5,
+                                                                bgcolor: "white",
+                                                                borderRadius: "6px",
+                                                                justifyContent: "space-between"
+                                                            }}
+                                                        >
+                                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                                                {getFileIcon(file.fileType)}
+                                                                <Box>
+                                                                    <Typography sx={{ fontFamily: "Medium_W", fontSize: "13px" }}>{file.fileName}</Typography>
+                                                                    <Typography sx={{ fontFamily: "Regular_W", fontSize: "11px", color: "var(--greyText)", textTransform: "capitalize" }}>
+                                                                        {file.fileType?.replace("-", " ")}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </Box>
+                                                            <Button
+                                                                size="small"
+                                                                startIcon={<MdDownload />}
+                                                                onClick={() => handleDownload(file.filePath, file.fileName)}
+                                                                sx={{ ...outlinedButtonStyle, fontSize: "11px", py: 0.5 }}
+                                                            >
+                                                                Download
+                                                            </Button>
+                                                        </Box>
+                                                    ))}
+                                                </Stack>
+                                            )}
+
+                                            <Button
+                                                variant="contained"
+                                                fullWidth
+                                                startIcon={<MdCheck />}
+                                                onClick={() => markDeliveredMutation.mutate(assignment._id)}
+                                                disabled={markDeliveredMutation.isPending}
+                                                sx={{
+                                                    bgcolor: "#22c55e",
+                                                    fontFamily: "Medium_W",
+                                                    "&:hover": { bgcolor: "#16a34a" }
+                                                }}
+                                            >
+                                                {markDeliveredMutation.isPending ? "Processing..." : "Confirm Delivery & Complete"}
+                                            </Button>
+                                        </Box>
                                     )}
 
-                                    {/* 6. Downloads */}
-                                    {canDownload && assignment.deliveryFiles?.length > 0 && (
-                                        <Box sx={{ mb: 2, p: 2, bgcolor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 2 }}>
-                                            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
-                                                <MdCloudDownload /> Download Your Project Files
-                                            </Typography>
-                                            <List dense>
-                                                {assignment.deliveryFiles.map((file: any, idx: number) => (
-                                                    <ListItem key={idx} secondaryAction={
-                                                        <IconButton edge="end" onClick={() => handleDownloadFile(file.filePath, file.fileName)}>
-                                                            <MdDownload />
-                                                        </IconButton>
-                                                    }>
-                                                        <ListItemIcon>{getFileIcon(file.fileType)}</ListItemIcon>
-                                                        <ListItemText primary={file.fileName} secondary={file.fileType} />
-                                                    </ListItem>
-                                                ))}
-                                            </List>
-                                            {assignment.status === "ready-for-download" && (
-                                                <Button variant="contained" onClick={() => markDeliveredMutation.mutate(assignment._id)} disabled={markDeliveredMutation.isPending} sx={{ ...smallPrimaryButton, mt: 1 }}>
-                                                    ✅ I have downloaded the files (Mark as Delivered)
+                                    {/* DELIVERED */}
+                                    {isDelivered && (
+                                        <Box sx={{ p: 3, bgcolor: "#f0fdf4", borderRadius: "8px", border: "1px solid #86efac" }}>
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                                                <MdCheckCircle color="#22c55e" size={20} />
+                                                <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "16px", color: "#16a34a" }}>
+                                                    Project Delivered Successfully!
+                                                </Typography>
+                                            </Box>
+
+                                            {assignment.deliveryFiles?.length > 0 && (
+                                                <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
+                                                    {assignment.deliveryFiles.map((file: any, idx: number) => (
+                                                        <Chip
+                                                            key={idx}
+                                                            label={file.fileName}
+                                                            size="small"
+                                                            icon={<MdDownload />}
+                                                            onClick={() => handleDownload(file.filePath, file.fileName)}
+                                                            sx={{ fontFamily: "Regular_W", fontSize: "11px", cursor: "pointer" }}
+                                                        />
+                                                    ))}
+                                                </Stack>
+                                            )}
+
+                                            {!assignment.feedback?.submitted && (
+                                                <Button
+                                                    variant="outlined"
+                                                    onClick={() => { setSelectedProject(assignment); setFeedbackModal(true); }}
+                                                    sx={{ ...outlinedButtonStyle }}
+                                                >
+                                                    Leave Feedback
+                                                </Button>
+                                            )}
+                                            {assignment.invoice?.url && (
+                                                <Button
+                                                    variant="outlined"
+                                                    startIcon={<MdDescription />}
+                                                    onClick={() => handleDownload(assignment.invoice.url, `Invoice_${assignment.invoice.invoiceNumber}.pdf`)}
+                                                    sx={{ ...outlinedButtonStyle, ml: 1 }}
+                                                >
+                                                    Download Invoice
                                                 </Button>
                                             )}
                                         </Box>
                                     )}
-
-                                    {/* Feedback Section */}
-                                    {assignment.feedback?.submittedAt ? (
-                                        <Box sx={{ mt: 2, p: 2, bgcolor: "#fef3c7", border: "1px solid #fcd34d", borderRadius: 2 }}>
-                                            <Typography variant="subtitle2" fontWeight="600">⭐ Your Feedback</Typography>
-                                            <Rating value={assignment.feedback.rating} readOnly sx={{ mt: 1 }} />
-                                            {assignment.feedback.comments && (
-                                                <Typography variant="body2" sx={{ mt: 1 }}>{assignment.feedback.comments}</Typography>
-                                            )}
-                                        </Box>
-                                    ) : canGiveFeedback && (
-                                        <Button variant="outlined" color="warning" onClick={() => handleOpenFeedback(assignment)} sx={{ ...textLinkStyle, mt: 2 }}>
-                                            ⭐ Give Feedback
-                                        </Button>
-                                    )}
-                                </CardContent>
+                                </Box>
                             </Card>
                         );
                     })}
-
-                    {/* Requirement Submission Modal */}
-                    <Dialog open={requirementModal} onClose={() => setRequirementModal(false)} maxWidth="sm" fullWidth>
-                        <DialogTitle>Submit Your Project Requirement</DialogTitle>
-                        <DialogContent>
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
-                                <Alert severity="info">Project Title will be used as the Topic.</Alert>
-                                {selectedProject?.itemId?.deliverables?.length > 0 && (
-                                    <Alert severity="warning">
-                                        <strong>Required Deliverables:</strong> {selectedProject.itemId.deliverables.join(", ")}
-                                    </Alert>
-                                )}
-                                <TextField select label="What do you need?" value={requirementForm.projectType} onChange={(e) => setRequirementForm({ ...requirementForm, projectType: e.target.value })} fullWidth>
-                                    {projectTypeOptions.map((opt) => (
-                                        <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                                    ))}
-                                </TextField>
-                                <TextField label="College/University Guidelines" value={requirementForm.collegeGuidelines} onChange={(e) => setRequirementForm({ ...requirementForm, collegeGuidelines: e.target.value })} fullWidth multiline rows={3} placeholder="Any specific format, word count, referencing style, etc." />
-                                <TextField label="Additional Notes / Instructions" value={requirementForm.notes} onChange={(e) => setRequirementForm({ ...requirementForm, notes: e.target.value })} fullWidth multiline rows={3} placeholder="Any other details you want us to know..." />
-                            </Box>
-                        </DialogContent>
-                        <DialogActions sx={{ p: 2 }}>
-                            <Button onClick={() => setRequirementModal(false)}>Cancel</Button>
-                            <Button variant="contained" onClick={() => submitRequirementMutation.mutate(selectedProject?._id)} disabled={submitRequirementMutation.isPending} sx={{ background: "linear-gradient(135deg, #f97316, #fb923c)" }}>
-                                {submitRequirementMutation.isPending ? "Submitting..." : "Submit Requirement"}
-                            </Button>
-                        </DialogActions>
-                    </Dialog>
-
-                    {/* Feedback Modal */}
-                    <Dialog open={feedbackModal} onClose={() => setFeedbackModal(false)} maxWidth="sm" fullWidth>
-                        <DialogTitle>Rate Your Experience</DialogTitle>
-                        <DialogContent>
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1, alignItems: "center" }}>
-                                <Typography variant="body2">How satisfied are you with the project delivery?</Typography>
-                                <Rating size="large" value={feedbackForm.rating} onChange={(_, value) => setFeedbackForm({ ...feedbackForm, rating: value || 0 })} />
-                                <TextField label="Comments (Optional)" value={feedbackForm.comments} onChange={(e) => setFeedbackForm({ ...feedbackForm, comments: e.target.value })} fullWidth multiline rows={3} placeholder="Share your thoughts..." />
-                            </Box>
-                        </DialogContent>
-                        <DialogActions sx={{ p: 2 }}>
-                            <Button onClick={() => setFeedbackModal(false)}>Cancel</Button>
-                            <Button variant="contained" onClick={() => submitFeedbackMutation.mutate(selectedProject?._id)} disabled={feedbackForm.rating === 0 || submitFeedbackMutation.isPending} sx={{ background: "linear-gradient(135deg, #f59e0b, #eab308)" }}>
-                                {submitFeedbackMutation.isPending ? "Submitting..." : "Submit Feedback"}
-                            </Button>
-                        </DialogActions>
-                    </Dialog>
                 </Box>
             )}
+
+            {/* Requirement Modal */}
+            <Dialog open={requirementModal} onClose={() => setRequirementModal(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    borderBottom: "1px solid var(--borderColor)",
+                    fontFamily: "SemiBold_W", fontSize: "16px"
+                }}>
+                    Submit Requirements
+                    <IconButton onClick={() => setRequirementModal(false)} size="small"><IoClose /></IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <TextField
+                            select
+                            label="Project Type"
+                            value={requirementForm.projectType}
+                            onChange={(e) => setRequirementForm({ ...requirementForm, projectType: e.target.value })}
+                            fullWidth
+                            sx={{ "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "13px" } }}
+                        >
+                            {projectTypeOptions.map(opt => (
+                                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                            ))}
+                        </TextField>
+                        <TextField
+                            label="College Guidelines / Instructions"
+                            value={requirementForm.collegeGuidelines}
+                            onChange={(e) => setRequirementForm({ ...requirementForm, collegeGuidelines: e.target.value })}
+                            fullWidth
+                            multiline
+                            rows={3}
+                            placeholder="Any specific requirements from your college..."
+                            sx={{ "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "13px" } }}
+                        />
+                        <TextField
+                            label="Additional Notes"
+                            value={requirementForm.notes}
+                            onChange={(e) => setRequirementForm({ ...requirementForm, notes: e.target.value })}
+                            fullWidth
+                            multiline
+                            rows={2}
+                        />
+
+                        {/* File Upload for Requirements */}
+                        <Box sx={{ border: "1px dashed var(--borderColor)", p: 2, borderRadius: "8px", textAlign: "center" }}>
+                            <input
+                                type="file"
+                                multiple
+                                id="requirement-files"
+                                style={{ display: "none" }}
+                                onChange={(e) => {
+                                    if (e.target.files) {
+                                        setRequirementFiles(Array.from(e.target.files));
+                                    }
+                                }}
+                            />
+                            <label htmlFor="requirement-files">
+                                <Button component="span" startIcon={<MdUpload />} sx={{ fontFamily: "Medium_W", textTransform: "none" }}>
+                                    Upload Guidelines/Docs
+                                </Button>
+                            </label>
+                            {requirementFiles.length > 0 && (
+                                <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1, justifyContent: "center" }}>
+                                    {requirementFiles.map((file, idx) => (
+                                        <Chip key={idx} label={file.name} onDelete={() => {
+                                            const newFiles = [...requirementFiles];
+                                            newFiles.splice(idx, 1);
+                                            setRequirementFiles(newFiles);
+                                        }} size="small" />
+                                    ))}
+                                </Box>
+                            )}
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    <Button onClick={() => setRequirementModal(false)} sx={{ fontFamily: "Medium_W", fontSize: "12px" }}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => submitRequirementMutation.mutate(selectedProject._id)}
+                        disabled={submitRequirementMutation.isPending}
+                        sx={{ ...primaryButtonStyle }}
+                    >
+                        {submitRequirementMutation.isPending ? "Submitting..." : "Submit"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Payment Proof Modal */}
+            <Dialog open={paymentProofModal} onClose={() => setPaymentProofModal(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    borderBottom: "1px solid var(--borderColor)",
+                    fontFamily: "SemiBold_W", fontSize: "16px"
+                }}>
+                    Upload Payment Proof
+                    <IconButton onClick={() => setPaymentProofModal(false)} size="small"><IoClose /></IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <Alert severity="info" sx={{ fontFamily: "Regular_W", fontSize: "13px" }}>
+                            Upload screenshot for <strong>{selectedProject?.itemId?.title}</strong>
+                            <br />Amount: <strong>₹{selectedProject?.payment?.amount}</strong>
+                        </Alert>
+
+                        <Button
+                            variant="outlined"
+                            component="label"
+                            sx={{ height: 100, borderStyle: "dashed", borderColor: "var(--borderColor)" }}
+                        >
+                            <Box sx={{ textAlign: "center" }}>
+                                <MdUpload size={32} />
+                                <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px" }}>
+                                    {paymentProofFile ? paymentProofFile.name : "Click to upload proof"}
+                                </Typography>
+                            </Box>
+                            <input type="file" hidden accept="image/*,.pdf" onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)} />
+                        </Button>
+
+                        <TextField
+                            select
+                            label="Payment Method"
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            fullWidth
+                            SelectProps={{ native: true }}
+                            sx={{ "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "13px" } }}
+                        >
+                            <option value="">Select Method</option>
+                            <option value="upi">UPI</option>
+                            <option value="bank-transfer">Bank Transfer</option>
+                            <option value="cash">Cash</option>
+                        </TextField>
+
+                        <TextField
+                            label="Transaction ID (Optional)"
+                            value={transactionId}
+                            onChange={(e) => setTransactionId(e.target.value)}
+                            fullWidth
+                            sx={{ "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "13px" } }}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    <Button onClick={() => setPaymentProofModal(false)} sx={{ fontFamily: "Medium_W", fontSize: "12px" }}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => {
+                            if (!paymentProofFile || !selectedProject) return;
+                            const formData = new FormData();
+                            formData.append("proofFile", paymentProofFile);
+                            if (paymentMethod) formData.append("paymentMethod", paymentMethod);
+                            if (transactionId) formData.append("transactionId", transactionId);
+
+                            paymentProofMutation.mutate({
+                                assignmentId: selectedProject._id,
+                                formData
+                            }, {
+                                onSuccess: () => {
+                                    CustomSnackBar.successSnackbar("Payment proof uploaded!");
+                                    queryClient.invalidateQueries({ queryKey: ["my-projects"] });
+                                    setPaymentProofModal(false);
+                                    setPaymentProofFile(null);
+                                    setPaymentMethod("");
+                                    setTransactionId("");
+                                },
+                                onError: (err: any) => CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed"),
+                            });
+                        }}
+                        disabled={!paymentProofFile || paymentProofMutation.isPending}
+                        sx={{ ...dangerButtonStyle }}
+                    >
+                        {paymentProofMutation.isPending ? "Uploading..." : "Submit Proof"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Feedback Modal */}
+            <Dialog open={feedbackModal} onClose={() => setFeedbackModal(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    borderBottom: "1px solid var(--borderColor)",
+                    fontFamily: "SemiBold_W", fontSize: "16px"
+                }}>
+                    Leave Feedback
+                    <IconButton onClick={() => setFeedbackModal(false)} size="small"><IoClose /></IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                        <Box sx={{ textAlign: "center" }}>
+                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px", mb: 1 }}>How was your experience?</Typography>
+                            <Rating
+                                value={feedbackForm.rating}
+                                onChange={(_, value) => setFeedbackForm({ ...feedbackForm, rating: value || 0 })}
+                                size="large"
+                            />
+                        </Box>
+                        <TextField
+                            label="Comments"
+                            value={feedbackForm.comments}
+                            onChange={(e) => setFeedbackForm({ ...feedbackForm, comments: e.target.value })}
+                            fullWidth
+                            multiline
+                            rows={3}
+                            placeholder="Share your thoughts..."
+                            sx={{ "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "13px" } }}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    <Button onClick={() => setFeedbackModal(false)} sx={{ fontFamily: "Medium_W", fontSize: "12px" }}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => submitFeedbackMutation.mutate(selectedProject._id)}
+                        disabled={!feedbackForm.rating || submitFeedbackMutation.isPending}
+                        sx={{ ...primaryButtonStyle }}
+                    >
+                        {submitFeedbackMutation.isPending ? "Submitting..." : "Submit Feedback"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

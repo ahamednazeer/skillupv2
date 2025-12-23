@@ -46,7 +46,14 @@ const getLast12Months = () => {
 };
 
 const AdminDashboard = () => {
-  const [monthYear, setMonthYear] = useState("07-2025");
+  // Default to current month
+  const getCurrentMonthYear = () => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const year = now.getFullYear();
+    return `${month}-${year}`;
+  };
+  const [monthYear, setMonthYear] = useState(getCurrentMonthYear());
   const { data, isLoading, error } = useGetDashboardCountsApi(monthYear);
 
   const cards = [

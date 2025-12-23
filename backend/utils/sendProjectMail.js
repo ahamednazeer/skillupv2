@@ -184,6 +184,18 @@ const sendProjectEmail = async (type, recipient, data) => {
             `;
             break;
 
+        case "PAYMENT_PROOF_UPLOADED": // To Admin
+            subject = `Payment Proof Uploaded: ${data.itemType} - ${data.itemName}`;
+            bodyContent = `
+                <p style="font-size: 16px; color: #000000ff;">Hello Admin,</p>
+                <p style="font-size: 16px;">Student <strong>${data.studentName}</strong> has uploaded payment proof for <strong style="color: ${highlightColor};">${data.itemName}</strong> (${data.itemType}).</p>
+                <p style="font-size: 14px;"><strong>Amount:</strong> ₹${data.amount || 0}</p>
+                <p style="font-size: 14px;"><strong>Payment Method:</strong> ${data.paymentMethod || "Not specified"}</p>
+                <p style="font-size: 14px;">Please review the proof and mark the payment as received.</p>
+                <a href="${dashboardUrl}/#/payment-management" style="${buttonStyle}">View Pending Payments</a>
+            `;
+            break;
+
         default:
             return;
     }

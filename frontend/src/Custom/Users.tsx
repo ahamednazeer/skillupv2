@@ -2,7 +2,6 @@ import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import {
   Box,
   IconButton,
-  Switch,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -14,10 +13,20 @@ import {
   Menu,
   MenuItem,
   Tooltip,
+  Tabs,
+  Tab,
+  Paper,
+  InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
+  Card,
+  CardContent,
+  Avatar,
 } from "@mui/material";
-import { MdDeleteOutline, MdEmail, MdAdd, MdMoreVert, MdAssignment } from "react-icons/md";
-import { FaUserPlus, FaPause, FaPlay } from "react-icons/fa";
-import { useState, useEffect } from "react";
+import { MdDeleteOutline, MdEmail, MdMoreVert, MdAssignment, MdSearch, MdFilterList, MdRefresh } from "react-icons/md";
+import { FaUserPlus, FaPause, FaPlay, FaUserGraduate, FaUserShield } from "react-icons/fa";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGetUsers, userDeleteApi, userUpdateApi } from "../Hooks/user";
 import CustomSnackBar from "./CustomSnackBar";
@@ -72,15 +81,20 @@ const AddStudentModal = ({ open, onClose, onSuccess }: { open: boolean; onClose:
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ fontWeight: 600 }}>Add New Student</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 600, borderBottom: "1px solid #e0e0e0" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <FaUserGraduate /> Add New Student
+        </Box>
+      </DialogTitle>
       <DialogContent>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
           <TextField
             label="Full Name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             fullWidth
             size="small"
+            placeholder="Enter student's full name"
           />
           <TextField
             label="Email"
@@ -89,6 +103,7 @@ const AddStudentModal = ({ open, onClose, onSuccess }: { open: boolean; onClose:
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             fullWidth
             size="small"
+            placeholder="student@email.com"
           />
           <TextField
             label="Mobile (10 digits)"
@@ -96,10 +111,11 @@ const AddStudentModal = ({ open, onClose, onSuccess }: { open: boolean; onClose:
             onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
             fullWidth
             size="small"
+            placeholder="9876543210"
           />
         </Box>
       </DialogContent>
-      <DialogActions sx={{ p: 2 }}>
+      <DialogActions sx={{ p: 2, borderTop: "1px solid #e0e0e0" }}>
         <Button onClick={onClose} variant="outlined" sx={{ ...cancelButtonStyle }}>Cancel</Button>
         <Button
           onClick={handleSubmit}
@@ -188,21 +204,36 @@ const AssignmentModal = ({ open, onClose, student }: { open: boolean; onClose: (
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 600 }}>
-        Assign to {student?.name}
+      <DialogTitle sx={{ fontWeight: 600, borderBottom: "1px solid #e0e0e0" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <MdAssignment /> Assign to {student?.name}
+        </Box>
       </DialogTitle>
       <DialogContent>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
           <Box sx={{ display: "flex", gap: 1 }}>
-            {["course", "internship", "project"].map((type) => (
+            {[
+              { type: "course", icon: "📚", label: "Course" },
+              { type: "internship", icon: "💼", label: "Internship" },
+              { type: "project", icon: "🎯", label: "Project" }
+            ].map(({ type, icon, label }) => (
               <Button
                 key={type}
                 variant={itemType === type ? "contained" : "outlined"}
                 onClick={() => { setItemType(type as any); setSelectedItem(""); }}
-                sx={{ textTransform: "capitalize", flex: 1 }}
+                sx={{
+                  flex: 1,
+                  textTransform: "none",
+                  bgcolor: itemType === type ? "var(--webprimary)" : "transparent",
+                  borderColor: "var(--webprimary)",
+                  color: itemType === type ? "#fff" : "var(--webprimary)",
+                  "&:hover": {
+                    bgcolor: itemType === type ? "var(--webprimary)" : "rgba(var(--webprimary-rgb), 0.1)",
+                  }
+                }}
                 size="small"
               >
-                {type}
+                {icon} {label}
               </Button>
             ))}
           </Box>
@@ -222,7 +253,7 @@ const AssignmentModal = ({ open, onClose, student }: { open: boolean; onClose: (
           </TextField>
         </Box>
       </DialogContent>
-      <DialogActions sx={{ p: 2 }}>
+      <DialogActions sx={{ p: 2, borderTop: "1px solid #e0e0e0" }}>
         <Button onClick={onClose} variant="outlined" sx={{ ...cancelButtonStyle }}>Cancel</Button>
         <Button
           onClick={handleAssign}
@@ -237,9 +268,23 @@ const AssignmentModal = ({ open, onClose, student }: { open: boolean; onClose: (
   );
 };
 
+// Stats Card Component
+const StatsCard = ({ icon, label, count, color }: { icon: React.ReactNode; label: string; count: number; color: string }) => (
+  <Card sx={{ flex: 1, minWidth: 140, bgcolor: `${color}15`, border: `1px solid ${color}30` }}>
+    <CardContent sx={{ py: 1.5, px: 2, "&:last-child": { pb: 1.5 } }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Box>
+          <Typography variant="h5" fontWeight="bold" color={color}>{count}</Typography>
+          <Typography variant="caption" color="text.secondary">{label}</Typography>
+        </Box>
+        <Box sx={{ color, opacity: 0.7, fontSize: 24 }}>{icon}</Box>
+      </Box>
+    </CardContent>
+  </Card>
+);
+
 const Users = () => {
   const { data: getUsersResponse, isLoading, error, refetch } = useGetUsers();
-  const { mutate: userStatusUpdate } = userUpdateApi();
   const { mutate: userDelete } = userDeleteApi();
   const [rows, setRows] = useState<any[]>([]);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -252,11 +297,52 @@ const Users = () => {
   const token = Cookies.get("skToken");
   const navigate = useNavigate();
 
+  // Filter states
+  const [tabValue, setTabValue] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
   useEffect(() => {
     if (getUsersResponse) {
       setRows(getUsersResponse);
     }
   }, [getUsersResponse]);
+
+  // Computed stats
+  const stats = useMemo(() => {
+    const all = rows.length;
+    const students = rows.filter(r => r.role === "student").length;
+    const admins = rows.filter(r => r.role === "admin").length;
+    const active = rows.filter(r => r.status === "Active" || r.status === "Self-Signed").length;
+    const pending = rows.filter(r => r.status === "Created" || r.status === "Invited").length;
+    return { all, students, admins, active, pending };
+  }, [rows]);
+
+  // Filtered rows based on tab, search, and status
+  const filteredRows = useMemo(() => {
+    let filtered = [...rows];
+
+    // Tab filter
+    if (tabValue === 1) filtered = filtered.filter(r => r.role === "student");
+    else if (tabValue === 2) filtered = filtered.filter(r => r.role === "admin");
+
+    // Search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(r =>
+        r.name?.toLowerCase().includes(term) ||
+        r.email?.toLowerCase().includes(term) ||
+        r.mobile?.includes(term)
+      );
+    }
+
+    // Status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(r => r.status === statusFilter);
+    }
+
+    return filtered;
+  }, [rows, tabValue, searchTerm, statusFilter]);
 
   const sendInviteMutation = useMutation({
     mutationFn: async (studentId: string) => {
@@ -353,9 +439,10 @@ const Users = () => {
     setMenuRow(null);
   };
 
-  const handleSendInvite = () => {
-    if (menuRow) {
-      sendInviteMutation.mutate(menuRow._id || menuRow.id);
+  const handleSendInvite = (row?: any) => {
+    const target = row || menuRow;
+    if (target) {
+      sendInviteMutation.mutate(target._id || target.id);
     }
     handleMenuClose();
   };
@@ -374,85 +461,119 @@ const Users = () => {
     handleMenuClose();
   };
 
-  const handleAssign = () => {
-    setSelectedStudent(menuRow);
+  const handleAssign = (row?: any) => {
+    setSelectedStudent(row || menuRow);
     setAssignModalOpen(true);
     handleMenuClose();
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Active":
-        return "success";
-      case "Self-Signed":
-        return "info";
-      case "Invited":
-        return "warning";
-      case "Created":
-        return "default";
-      case "Suspended":
-        return "error";
-      case "Deleted":
-        return "error";
-      default:
-        return "default";
+      case "Active": return "success";
+      case "Self-Signed": return "info";
+      case "Invited": return "warning";
+      case "Created": return "default";
+      case "Suspended": return "error";
+      case "Deleted": return "error";
+      default: return "default";
     }
   };
 
-  const getRoleColor = (role: string) => {
-    return role === "admin" ? "secondary" : "primary";
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "Active": return "✓ Active";
+      case "Self-Signed": return "✓ Verified";
+      case "Invited": return "📧 Invited";
+      case "Created": return "🕐 Pending";
+      case "Suspended": return "⛔ Suspended";
+      default: return status;
+    }
   };
 
   const columns: GridColDef[] = [
     {
-      field: "sno",
-      headerName: "S.No",
-      width: 70,
-      renderCell: (params) => {
-        const rowIndex = rows.findIndex(
-          (row: any) => (row._id || row.id) === (params.row._id || params.row.id)
-        );
-        return rowIndex + 1;
-      },
+      field: "name",
+      headerName: "User",
+      width: 220,
+      renderCell: (params) => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Avatar sx={{ width: 32, height: 32, bgcolor: params.row.role === "admin" ? "#8b5cf6" : "#3b82f6", fontSize: 14 }}>
+            {params.row.name?.charAt(0)?.toUpperCase() || "?"}
+          </Avatar>
+          <Box>
+            <Typography variant="body2" fontWeight={600}>{params.row.name}</Typography>
+            <Typography variant="caption" color="text.secondary">{params.row.email}</Typography>
+          </Box>
+        </Box>
+      ),
     },
-    { field: "name", headerName: "Name", width: 140 },
-    { field: "email", headerName: "Email", width: 180 },
-    { field: "mobile", headerName: "Mobile", width: 120 },
+    { field: "mobile", headerName: "Mobile", width: 130 },
     {
       field: "role",
       headerName: "Role",
-      width: 100,
+      width: 110,
       renderCell: (params) => (
         <Chip
+          icon={params.row.role === "admin" ? <FaUserShield size={12} /> : <FaUserGraduate size={12} />}
           label={params.row.role || "user"}
           size="small"
-          color={getRoleColor(params.row.role)}
-          sx={{ textTransform: "capitalize" }}
+          sx={{
+            textTransform: "capitalize",
+            bgcolor: params.row.role === "admin" ? "#8b5cf615" : "#3b82f615",
+            color: params.row.role === "admin" ? "#8b5cf6" : "#3b82f6",
+            border: `1px solid ${params.row.role === "admin" ? "#8b5cf640" : "#3b82f640"}`,
+            fontWeight: 500,
+          }}
         />
       ),
     },
     {
       field: "status",
       headerName: "Status",
-      width: 120,
+      width: 130,
       renderCell: (params) => (
         <Chip
-          label={params.row.status || "Active"}
+          label={getStatusLabel(params.row.status || "Active")}
           size="small"
           color={getStatusColor(params.row.status)}
+          sx={{ fontWeight: 500 }}
         />
       ),
     },
     {
-      field: "actions",
-      headerName: "Actions",
-      width: 120,
+      field: "quickActions",
+      headerName: "Quick Actions",
+      width: 200,
       renderCell: (params) => (
         <Box sx={{ display: "flex", gap: 0.5 }}>
+          {params.row.role === "student" && (
+            <>
+              {(params.row.status === "Created" || params.row.status === "Invited") && (
+                <Tooltip title="Send Invite">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => { e.stopPropagation(); handleSendInvite(params.row); }}
+                    sx={{ color: "#f59e0b" }}
+                  >
+                    <MdEmail />
+                  </IconButton>
+                </Tooltip>
+              )}
+              <Tooltip title="Assign Course/Project">
+                <IconButton
+                  size="small"
+                  onClick={(e) => { e.stopPropagation(); handleAssign(params.row); }}
+                  sx={{ color: "#3b82f6" }}
+                >
+                  <MdAssignment />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
           <Tooltip title="More Actions">
             <IconButton
               size="small"
-              onClick={(e) => handleMenuOpen(e, params.row)}
+              onClick={(e) => { e.stopPropagation(); handleMenuOpen(e, params.row); }}
             >
               <MdMoreVert />
             </IconButton>
@@ -460,8 +581,8 @@ const Users = () => {
           <Tooltip title="Delete">
             <IconButton
               size="small"
-              onClick={() => handleAction(params.row._id || params.row.id)}
-              sx={{ color: "var(--red)" }}
+              onClick={(e) => { e.stopPropagation(); handleAction(params.row._id || params.row.id); }}
+              sx={{ color: "#ef4444" }}
             >
               <MdDeleteOutline />
             </IconButton>
@@ -473,98 +594,150 @@ const Users = () => {
 
   if (error) {
     return (
-      <div className="Submitted_form_table">
-        <Box sx={{ padding: 2, textAlign: "center", color: "var(--red)" }}>
-          Error loading users: {error.message || "Something went wrong"}
-        </Box>
-      </div>
+      <Box sx={{ p: 3, textAlign: "center", color: "#ef4444" }}>
+        Error loading users: {error.message || "Something went wrong"}
+      </Box>
     );
   }
 
   return (
     <>
-      <div className="Submitted_form_table">
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: "1rem",
-            justifyContent: "space-between",
-            marginBottom: "15px",
-            "@media (max-width:600px)": {
-              flexDirection: "column",
-              alignItems: "start",
-            },
-          }}
-        >
-          <Typography variant="h6" fontWeight="bold">
+      <Box sx={{ p: 3 }}>
+        {/* Header */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+          <Typography variant="h5" fontWeight="bold">
             User Management
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<FaUserPlus />}
-            onClick={() => setAddModalOpen(true)}
-            sx={{
-              ...primaryButtonStyle,
-              borderRadius: 2,
-              padding: "6px 14px",
-            }}
-          >
-            Add Student
-          </Button>
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Tooltip title="Refresh">
+              <IconButton onClick={() => refetch()} sx={{ border: "1px solid #e0e0e0" }}>
+                <MdRefresh />
+              </IconButton>
+            </Tooltip>
+            <Button
+              variant="contained"
+              startIcon={<FaUserPlus />}
+              onClick={() => setAddModalOpen(true)}
+              sx={{ ...primaryButtonStyle, borderRadius: 2 }}
+            >
+              Add Student
+            </Button>
+          </Box>
         </Box>
-        <DataGrid
-          rows={rows}
-          columns={columns}
-          loading={isLoading}
-          initialState={{
-            pagination: {
-              paginationModel: { page: 0, pageSize: 10 },
-            },
-          }}
-          pageSizeOptions={[10, 20, 50]}
-          checkboxSelection={false}
-          disableRowSelectionOnClick={false}
-          onRowClick={(params) => {
-            if (params.row.role === "student") {
-              navigate(`/student/${params.row._id}`);
-            }
-          }}
-          className="table_border"
-          autoHeight
-          getRowId={(row) => row._id || row.id}
-        />
-      </div>
+
+        {/* Stats Cards */}
+        <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
+          <StatsCard icon={<FaUserGraduate />} label="Students" count={stats.students} color="#3b82f6" />
+          <StatsCard icon={<FaUserShield />} label="Admins" count={stats.admins} color="#8b5cf6" />
+          <StatsCard icon={<FaPlay />} label="Active" count={stats.active} color="#10b981" />
+          <StatsCard icon={<MdEmail />} label="Pending Invite" count={stats.pending} color="#f59e0b" />
+        </Box>
+
+        {/* Tabs */}
+        <Paper sx={{ mb: 2 }}>
+          <Tabs
+            value={tabValue}
+            onChange={(_, v) => setTabValue(v)}
+            indicatorColor="primary"
+            textColor="primary"
+          >
+            <Tab label={`All Users (${stats.all})`} />
+            <Tab label={`Students (${stats.students})`} icon={<FaUserGraduate size={14} />} iconPosition="start" />
+            <Tab label={`Admins (${stats.admins})`} icon={<FaUserShield size={14} />} iconPosition="start" />
+          </Tabs>
+        </Paper>
+
+        {/* Filters Row */}
+        <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+          <TextField
+            placeholder="Search by name, email, or mobile..."
+            size="small"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            sx={{ minWidth: 280, flex: 1, maxWidth: 400 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <MdSearch color="#9ca3af" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={statusFilter}
+              label="Status"
+              onChange={(e) => setStatusFilter(e.target.value)}
+              startAdornment={<MdFilterList style={{ marginRight: 8, color: "#9ca3af" }} />}
+            >
+              <MenuItem value="all">All Statuses</MenuItem>
+              <MenuItem value="Active">Active</MenuItem>
+              <MenuItem value="Self-Signed">Verified</MenuItem>
+              <MenuItem value="Invited">Invited</MenuItem>
+              <MenuItem value="Created">Pending</MenuItem>
+              <MenuItem value="Suspended">Suspended</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        {/* Data Table */}
+        <Paper elevation={0} sx={{ border: "1px solid #e5e7eb", borderRadius: 2 }}>
+          <DataGrid
+            rows={filteredRows}
+            columns={columns}
+            loading={isLoading}
+            initialState={{
+              pagination: { paginationModel: { page: 0, pageSize: 10 } },
+            }}
+            pageSizeOptions={[10, 20, 50]}
+            checkboxSelection={false}
+            disableRowSelectionOnClick={false}
+            onRowClick={(params) => {
+              if (params.row.role === "student") {
+                navigate(`/student/${params.row._id}`);
+              }
+            }}
+            autoHeight
+            getRowId={(row) => row._id || row.id}
+            sx={{
+              border: "none",
+              "& .MuiDataGrid-row:hover": { bgcolor: "#f8fafc" },
+              "& .MuiDataGrid-columnHeaders": { bgcolor: "#f8fafc" },
+            }}
+          />
+        </Paper>
+      </Box>
 
       {/* Actions Menu */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
-        sx={{ "& .MuiPaper-root": { borderRadius: 2, minWidth: 180 } }}
+        sx={{ "& .MuiPaper-root": { borderRadius: 2, minWidth: 180, boxShadow: "0 4px 20px rgba(0,0,0,0.1)" } }}
       >
         {menuRow?.role === "student" && menuRow?.status === "Created" && (
-          <MenuItem onClick={handleSendInvite}>
-            <MdEmail style={{ marginRight: 8 }} /> Send Invite
+          <MenuItem onClick={() => handleSendInvite()}>
+            <MdEmail style={{ marginRight: 8, color: "#f59e0b" }} /> Send Invite
           </MenuItem>
         )}
         {menuRow?.role === "student" && menuRow?.status === "Invited" && (
-          <MenuItem onClick={handleSendInvite}>
-            <MdEmail style={{ marginRight: 8 }} /> Resend Invite
+          <MenuItem onClick={() => handleSendInvite()}>
+            <MdEmail style={{ marginRight: 8, color: "#f59e0b" }} /> Resend Invite
           </MenuItem>
         )}
         {menuRow?.role === "student" && (
-          <MenuItem onClick={handleAssign}>
-            <MdAssignment style={{ marginRight: 8 }} /> Assign Items
+          <MenuItem onClick={() => handleAssign()}>
+            <MdAssignment style={{ marginRight: 8, color: "#3b82f6" }} /> Assign Items
           </MenuItem>
         )}
         {menuRow?.status !== "Suspended" && menuRow?.status !== "Deleted" && (
-          <MenuItem onClick={handleSuspend} sx={{ color: "error.main" }}>
+          <MenuItem onClick={handleSuspend} sx={{ color: "#ef4444" }}>
             <FaPause style={{ marginRight: 8 }} /> Suspend
           </MenuItem>
         )}
         {menuRow?.status === "Suspended" && (
-          <MenuItem onClick={handleActivate} sx={{ color: "success.main" }}>
+          <MenuItem onClick={handleActivate} sx={{ color: "#10b981" }}>
             <FaPlay style={{ marginRight: 8 }} /> Activate
           </MenuItem>
         )}
@@ -576,23 +749,15 @@ const Users = () => {
         onClose={handleDeleteCancel}
         maxWidth="xs"
         fullWidth
-        sx={{
-          "& .MuiDialog-paper": {
-            borderRadius: "12px",
-            padding: "0",
-            margin: "16px",
-            maxWidth: "380px",
-          },
-        }}
       >
-        <DialogTitle sx={{ textAlign: "center", color: "var(--red)", fontWeight: "600" }}>
-          Delete User
+        <DialogTitle sx={{ textAlign: "center", color: "#ef4444", fontWeight: 600, pt: 3 }}>
+          ⚠️ Delete User
         </DialogTitle>
-        <DialogContent sx={{ textAlign: "center" }}>
-          <Typography sx={{ color: "#666" }}>
+        <DialogContent sx={{ textAlign: "center", pb: 2 }}>
+          <Typography color="text.secondary">
             Are you sure you want to delete this user?
           </Typography>
-          <Typography sx={{ color: "#999", fontSize: "0.875rem", mt: 1 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
             This action cannot be undone.
           </Typography>
         </DialogContent>
@@ -600,11 +765,7 @@ const Users = () => {
           <Button onClick={handleDeleteCancel} variant="outlined" sx={{ ...cancelButtonStyle }}>
             Cancel
           </Button>
-          <Button
-            onClick={handleDeleteConfirm}
-            variant="contained"
-            sx={{ ...dangerButtonStyle }}
-          >
+          <Button onClick={handleDeleteConfirm} variant="contained" sx={{ ...dangerButtonStyle }}>
             Delete
           </Button>
         </DialogActions>

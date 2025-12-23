@@ -23,18 +23,19 @@ import Cookies from "js-cookie";
 import { FaUsers } from "react-icons/fa";
 import { TbLayoutDashboard } from "react-icons/tb";
 import { FiBook } from "react-icons/fi";
-import { AiOutlineRead } from "react-icons/ai";
-import { MdOutlineCategory, MdOutlineLocalOffer, MdOutlineAnnouncement, MdAssignment, MdAttachMoney, MdHistory } from "react-icons/md";
+
+import { MdOutlineCategory, MdOutlineLocalOffer, MdOutlineAnnouncement, MdAttachMoney, MdSchool } from "react-icons/md";
 import {
   CarreerRoutes,
   CategoryRoutes,
   CertificateRoutes,
-  CoursesRoutes,
+
   DashboardRoutes,
   OffersRoutes,
   SyllabusRoutes,
   UsersRoutes,
 } from "./RoutesActive";
+import { ProgramsRoutes, PayrollRoutes } from "./RoutesActive";
 import { GrUserWorker } from "react-icons/gr";
 import { PiCertificate } from "react-icons/pi";
 interface SidebarProps {
@@ -120,17 +121,17 @@ const Sidebar = ({ isOpen, isMobile }: SidebarProps) => {
                       transition: "background-color 0.3s ease, color 0.3s ease",
                     }}>
                       <FaUsers />
-                      {(isOpen || isMobile) && "Users"}
+                      {(isOpen || isMobile) && "People Management"}
                     </Box>
                   </Link>
                   <Link to={"/courses"}>
                     <Box sx={{
-                      backgroundColor: CoursesRoutes.includes(location.pathname) ? "var(--buttonPrimary)" : "transparent",
-                      color: CoursesRoutes.includes(location.pathname) ? "var(--white)" : "inherit",
+                      backgroundColor: ProgramsRoutes.includes(location.pathname) ? "var(--buttonPrimary)" : "transparent",
+                      color: ProgramsRoutes.includes(location.pathname) ? "var(--white)" : "inherit",
                       transition: "background-color 0.3s ease, color 0.3s ease",
                     }}>
-                      <AiOutlineRead />
-                      {(isOpen || isMobile) && "Courses"}
+                      <MdSchool />
+                      {(isOpen || isMobile) && "Program Management"}
                     </Box>
                   </Link>
                   <Link to={"/syllabus"}>
@@ -193,66 +194,17 @@ const Sidebar = ({ isOpen, isMobile }: SidebarProps) => {
                       {(isOpen || isMobile) && "Announcements"}
                     </Box>
                   </Link>
-                  <Link to={"/submissions"}>
-                    <Box sx={{
-                      backgroundColor: location.pathname === "/submissions" ? "var(--buttonPrimary)" : "transparent",
-                      color: location.pathname === "/submissions" ? "var(--white)" : "inherit",
-                      transition: "background-color 0.3s ease, color 0.3s ease",
-                    }}>
-                      <MdAssignment />
-                      {(isOpen || isMobile) && "Submissions"}
-                    </Box>
-                  </Link>
-                  <Link to={"/project-submissions"}>
-                    <Box sx={{
-                      backgroundColor: location.pathname === "/project-submissions" ? "var(--buttonPrimary)" : "transparent",
-                      color: location.pathname === "/project-submissions" ? "var(--white)" : "inherit",
-                      transition: "background-color 0.3s ease, color 0.3s ease",
-                    }}>
-                      <MdAssignment />
-                      {(isOpen || isMobile) && "Project Submissions"}
-                    </Box>
-                  </Link>
 
-                  {/* Payroll Links */}
-                  <Link to={"/employees"}>
-                    <Box sx={{
-                      backgroundColor: location.pathname.includes("/employees") ? "var(--buttonPrimary)" : "transparent",
-                      color: location.pathname.includes("/employees") ? "var(--white)" : "inherit",
-                      transition: "all 0.3s ease"
-                    }}>
-                      <FaUsers />
-                      {(isOpen || isMobile) && "Employees"}
-                    </Box>
-                  </Link>
+
+
                   <Link to={"/payroll/generate"}>
                     <Box sx={{
-                      backgroundColor: location.pathname.includes("/payroll/generate") ? "var(--buttonPrimary)" : "transparent",
-                      color: location.pathname.includes("/payroll/generate") ? "var(--white)" : "inherit",
+                      backgroundColor: PayrollRoutes.includes(location.pathname) ? "var(--buttonPrimary)" : "transparent",
+                      color: PayrollRoutes.includes(location.pathname) ? "var(--white)" : "inherit",
                       transition: "all 0.3s ease"
                     }}>
                       <MdAttachMoney />
-                      {(isOpen || isMobile) && "Generate Payslip"}
-                    </Box>
-                  </Link>
-                  <Link to={"/payroll/history"}>
-                    <Box sx={{
-                      backgroundColor: location.pathname.includes("/payroll/history") ? "var(--buttonPrimary)" : "transparent",
-                      color: location.pathname.includes("/payroll/history") ? "var(--white)" : "inherit",
-                      transition: "all 0.3s ease"
-                    }}>
-                      <MdHistory />
-                      {(isOpen || isMobile) && "Payslip History"}
-                    </Box>
-                  </Link>
-                  <Link to={"/payroll/settings"}>
-                    <Box sx={{
-                      backgroundColor: location.pathname.includes("/payroll/settings") ? "var(--buttonPrimary)" : "transparent",
-                      color: location.pathname.includes("/payroll/settings") ? "var(--white)" : "inherit",
-                      transition: "all 0.3s ease"
-                    }}>
-                      <MdOutlineCategory />
-                      {(isOpen || isMobile) && "Payroll Settings"}
+                      {(isOpen || isMobile) && "Payroll Management"}
                     </Box>
                   </Link>
 
@@ -267,16 +219,18 @@ const Sidebar = ({ isOpen, isMobile }: SidebarProps) => {
                     </Box>
                   </Link>
 
-                  <Link to={"/internships"}>
+                  <Link to={"/payment-management"}>
                     <Box sx={{
-                      backgroundColor: location.pathname === "/internships" ? "var(--buttonPrimary)" : "transparent",
-                      color: location.pathname === "/internships" ? "var(--white)" : "inherit",
-                      transition: "background-color 0.3s ease, color 0.3s ease",
+                      backgroundColor: location.pathname === "/payment-management" ? "var(--buttonPrimary)" : "transparent",
+                      color: location.pathname === "/payment-management" ? "var(--white)" : "inherit",
+                      transition: "all 0.3s ease"
                     }}>
-                      <MdAssignment />
-                      {(isOpen || isMobile) && "Internships"}
+                      <MdAttachMoney />
+                      {(isOpen || isMobile) && "Payment Management"}
                     </Box>
                   </Link>
+
+
                 </>
               )}
 

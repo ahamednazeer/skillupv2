@@ -13,6 +13,9 @@ import {
     Chip,
     MenuItem,
     Grid,
+    Tabs,
+    Tab,
+    Paper,
 } from "@mui/material";
 import { MdAdd, MdEdit, MdDelete } from "react-icons/md";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -20,10 +23,12 @@ import axios from "axios";
 import Cookies from "js-cookie";
 import CustomSnackBar from "../Custom/CustomSnackBar";
 import { primaryButtonStyle, cancelButtonStyle, submitButtonStyle } from "../assets/Styles/ButtonStyles";
+import ProjectSubmissions from "./ProjectSubmissions";
 
 const ProjectManagement = () => {
     const token = Cookies.get("skToken");
     const queryClient = useQueryClient();
+    const [tabValue, setTabValue] = useState(0);
     const [modalOpen, setModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
     const [formData, setFormData] = useState({
@@ -37,7 +42,6 @@ const ProjectManagement = () => {
         projectType: "individual",
         maxGroupSize: 1,
         skills: "",
-        status: "Active",
         status: "Active",
         maxScore: 100,
         passingScore: 40,
@@ -138,9 +142,6 @@ const ProjectManagement = () => {
                 skills: (item.skills || []).join(", "),
                 status: item.status || "Active",
                 maxScore: item.maxScore || 100,
-                skills: (item.skills || []).join(", "),
-                status: item.status || "Active",
-                maxScore: item.maxScore || 100,
                 passingScore: item.passingScore || 40,
                 deliverables: item.deliverables || [],
             });
@@ -223,26 +224,39 @@ const ProjectManagement = () => {
         <Box sx={{ p: 3 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
                 <Typography variant="h5" fontWeight="bold">📝 Projects</Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<MdAdd />}
-                    onClick={() => handleOpen()}
-                    sx={{ ...primaryButtonStyle }}
-                >
-                    Add Project
-                </Button>
+                {tabValue === 0 && (
+                    <Button
+                        variant="contained"
+                        startIcon={<MdAdd />}
+                        onClick={() => handleOpen()}
+                        sx={{ ...primaryButtonStyle }}
+                    >
+                        Add Project
+                    </Button>
+                )}
             </Box>
 
-            <DataGrid
-                rows={data || []}
-                columns={columns}
-                loading={isLoading}
-                getRowId={(row) => row._id}
-                pageSizeOptions={[10, 25]}
-                initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-                autoHeight
-                sx={{ borderRadius: 2 }}
-            />
+            <Paper sx={{ mb: 3 }}>
+                <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} indicatorColor="primary" textColor="primary">
+                    <Tab label="Manage Projects" />
+                    <Tab label="Student Submissions & Certificates" />
+                </Tabs>
+            </Paper>
+
+            {tabValue === 0 ? (
+                <DataGrid
+                    rows={data || []}
+                    columns={columns}
+                    loading={isLoading}
+                    getRowId={(row) => row._id}
+                    pageSizeOptions={[10, 25]}
+                    initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+                    autoHeight
+                    sx={{ borderRadius: 2 }}
+                />
+            ) : (
+                <ProjectSubmissions />
+            )}
 
             <Dialog open={modalOpen} onClose={handleClose} maxWidth="md" fullWidth>
                 <DialogTitle>{editingItem ? "Edit Project" : "New Project"}</DialogTitle>

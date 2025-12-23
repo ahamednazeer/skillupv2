@@ -7,6 +7,7 @@ const bcrypt = require("bcryptjs");
 const StudentAssignment = require("../models/StudentAssignment");
 const Announcement = require("../models/Announcement");
 const submissionController = require("../controllers/submissionController");
+const upload = require("../config/multer");
 
 // ===== Public Routes (No Auth Required) =====
 
@@ -298,7 +299,8 @@ router.get("/projects/:assignmentId", async (req, res) => {
 const sendProjectEmail = require("../utils/sendProjectMail");
 
 // Submit project requirement
-router.post("/projects/:assignmentId/submit-requirement", async (req, res) => {
+// Submit project requirement
+router.post("/projects/:assignmentId/submit-requirement", upload.array("files"), async (req, res) => {
     try {
         const { topic, projectType, collegeGuidelines, notes } = req.body;
 
@@ -321,12 +323,19 @@ router.post("/projects/:assignmentId/submit-requirement", async (req, res) => {
             return res.status(400).json({ message: "Requirement already submitted" });
         }
 
+        // Process uploaded files
+        const attachments = req.files ? req.files.map(file => ({
+            fileName: file.originalname,
+            filePath: file.path || file.location, // Support local or S3/B2
+            uploadedAt: new Date()
+        })) : [];
+
         assignment.requirementSubmission = {
             topic,
             projectType: projectType || "other",
             collegeGuidelines: collegeGuidelines || "",
             notes: notes || "",
-            attachments: [], // File uploads handled separately
+            attachments: attachments,
             submittedBy: req.user.id,
             submittedByRole: "student",
             submittedAt: new Date()
@@ -339,7 +348,13 @@ router.post("/projects/:assignmentId/submit-requirement", async (req, res) => {
         await sendProjectEmail("REQUIREMENT_SUBMITTED", { email: process.env.ADMIN_EMAIL || "admin@skillup.com", name: "Admin" }, {
             projectTitle: assignment.itemId.title || assignment.itemId.name,
             studentName: req.user.name,
-            requirementSummary: `Topic: ${topic}, Type: ${projectType}`
+            topic: topic,
+            type: projectType
+        });
+
+        // Send confirmation to student
+        await sendProjectEmail("REQUIREMENT_RECEIVED", { email: req.user.email, name: req.user.name }, {
+            projectTitle: assignment.itemId.title || assignment.itemId.name
         });
 
         res.status(200).json({
@@ -350,6 +365,7 @@ router.post("/projects/:assignmentId/submit-requirement", async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 });
+
 
 // Get delivery files for download
 router.get("/projects/:assignmentId/delivery-files", async (req, res) => {
@@ -460,7 +476,7 @@ router.post("/projects/:assignmentId/feedback", async (req, res) => {
 // ===== COURSE WORKFLOW ROUTES =====
 
 const b2Service = require("../utils/b2Service");
-const upload = require("../config/multer");
+
 
 // Upload course assignment
 router.post("/courses/:assignmentId/upload-assignment", upload.single("file"), async (req, res) => {
@@ -496,6 +512,73 @@ router.post("/courses/:assignmentId/upload-assignment", upload.single("file"), a
 
         res.status(200).json({
             message: "Assignment uploaded successfully",
+            assignment
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// ===== PAYMENT PROOF UPLOAD =====
+
+// Upload payment proof for any assignment type (course/project/internship)
+router.post("/assignments/:assignmentId/upload-payment-proof", upload.single("proofFile"), async (req, res) => {
+    try {
+        const { paymentMethod, transactionId } = req.body;
+
+        const assignment = await StudentAssignment.findOne({
+            _id: req.params.assignmentId,
+            student: req.user.id
+        }).populate("itemId").populate("student", "name email");
+
+        if (!assignment) {
+            return res.status(404).json({ message: "Assignment not found" });
+        }
+
+        if (assignment.payment?.status !== "pending") {
+            return res.status(400).json({ message: "Payment is not pending for this assignment" });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ message: "No proof file uploaded" });
+        }
+
+        // Upload to B2
+        const uploadResult = await b2Service.uploadFile(req.file.buffer, req.file.originalname, "payment-proofs");
+
+        // Update payment with proof details
+        assignment.payment.proofFile = uploadResult.url;
+        assignment.payment.proofUploadedAt = new Date();
+        assignment.payment.paymentMethod = paymentMethod || "other";
+        if (transactionId) {
+            assignment.payment.transactionId = transactionId;
+        }
+
+        await assignment.save();
+
+        // Notify Admin
+        const itemName = assignment.itemId?.name || assignment.itemId?.title || "Item";
+        const itemType = assignment.itemType.charAt(0).toUpperCase() + assignment.itemType.slice(1);
+
+        // Send email notification to admin
+        try {
+            const sendProjectEmail = require("../utils/sendProjectMail");
+            await sendProjectEmail("PAYMENT_PROOF_UPLOADED", {
+                email: process.env.ADMIN_EMAIL || "admin@skillup.com",
+                name: "Admin"
+            }, {
+                studentName: req.user.name,
+                itemType: itemType,
+                itemName: itemName,
+                amount: assignment.payment.amount,
+                paymentMethod: paymentMethod || "other"
+            });
+        } catch (emailErr) {
+            console.error("Failed to send admin notification:", emailErr);
+        }
+
+        res.status(200).json({
+            message: "Payment proof uploaded successfully",
             assignment
         });
     } catch (err) {

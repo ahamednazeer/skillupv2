@@ -17,7 +17,14 @@ export const resetPasswordSchema = z.object({
     .string()
     .min(1, { message: "Password is required" })
     .min(8, { message: "Password must be at least 8 characters" })
-    .max(12, { message: "Password must be not more than 12 characters" }),
+    .max(20, { message: "Password must be not more than 20 characters" })
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+      {
+        message:
+          "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+      }
+    ),
 });
 
 export const SignupSchema = z.object({

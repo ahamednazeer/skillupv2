@@ -55,10 +55,31 @@ const Login = () => {
         onSuccess: (response: any) => {
           console.log(response);
           const user = response.user;
-          Cookies.set("email", user.email, { path: "/" });
-          Cookies.set("role", user.role, { path: "/" });
-          Cookies.set("name", user.name, { path: "/" });
-          Cookies.set("skToken", response.token, { path: "/" });
+
+          // Cookie security options
+          const isProduction = window.location.protocol === 'https:';
+          const cookieOptions = {
+            path: "/",
+            sameSite: "strict" as const,
+            ...(isProduction && { secure: true })
+          };
+
+          // Store user info
+          Cookies.set("email", user.email, cookieOptions);
+          Cookies.set("role", user.role, cookieOptions);
+          Cookies.set("name", user.name, cookieOptions);
+
+          // Store tokens (support both old and new format)
+          const accessToken = response.accessToken || response.token;
+          Cookies.set("skToken", accessToken, cookieOptions);
+
+          // Store refresh token if provided
+          if (response.refreshToken) {
+            Cookies.set("skRefreshToken", response.refreshToken, {
+              ...cookieOptions,
+              expires: 7 // 7 days
+            });
+          }
 
           // Check user status
           if (user.status !== "Active" && user.status !== "Self-Signed") {

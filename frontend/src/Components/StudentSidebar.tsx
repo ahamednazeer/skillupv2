@@ -50,13 +50,34 @@ const StudentSidebar = ({ isOpen, isMobile }: SidebarProps) => {
         setLogoutModalOpen(true);
     };
 
-    const HandleLogoutConfirm = () => {
-        Cookies.remove("name");
-        Cookies.remove("role");
-        Cookies.remove("skToken");
-        Cookies.remove("email");
-        setLogoutModalOpen(false);
-        navigate("/");
+    const HandleLogoutConfirm = async () => {
+        try {
+            const accessToken = Cookies.get("skToken");
+            const refreshToken = Cookies.get("skRefreshToken");
+
+            // Call logout API to invalidate tokens
+            if (accessToken) {
+                await fetch(`${import.meta.env.VITE_APP_BASE_URL}logout`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify({ refreshToken })
+                }).catch(() => {
+                    // Ignore errors, proceed with local logout
+                });
+            }
+        } finally {
+            // Clear all cookies
+            Cookies.remove("name");
+            Cookies.remove("role");
+            Cookies.remove("skToken");
+            Cookies.remove("skRefreshToken");
+            Cookies.remove("email");
+            setLogoutModalOpen(false);
+            navigate("/");
+        }
     };
 
     const HandleLogoutCancel = () => {

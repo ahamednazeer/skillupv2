@@ -17,12 +17,11 @@ import {
     TableHead,
     TableRow,
     TableContainer,
-    Paper,
     Tabs,
     Tab,
     CircularProgress,
     Alert,
-    Tooltip,
+    MenuItem,
 } from "@mui/material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -30,10 +29,12 @@ import Cookies from "js-cookie";
 import {
     MdSchool,
     MdUpload,
-    MdCheckCircle,
-    MdPerson,
-    MdAssignment
+    MdAssignment,
+    MdDownload,
+    MdVisibility,
+    MdDelete
 } from "react-icons/md";
+import { IoCheckmarkDoneCircle } from "react-icons/io5";
 import CustomSnackBar from "../../Custom/CustomSnackBar";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -43,6 +44,7 @@ import msme from "../../assets/Images/msms.png";
 import iso from "../../assets/Images/isonew.png";
 import iaf from "../../assets/Images/iaf.png";
 import sign from "../../assets/Images/dummysign.png";
+import { smallPrimaryButton } from "../../assets/Styles/ButtonStyles";
 
 const InternshipSubmissionsList = () => {
     const token = Cookies.get("skToken");
@@ -236,7 +238,241 @@ const InternshipSubmissionsList = () => {
                 </TableContainer>
             </Card>
 
+            {/* Upload Modal - Premium Design */}
+            <Dialog open={uploadModal} onClose={() => setUploadModal(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{
+                    fontFamily: "SemiBold_W",
+                    fontSize: "18px",
+                    borderBottom: "1px solid #e0e0e0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1
+                }}>
+                    <MdUpload /> Upload Internship Materials
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+                        <Alert severity="info" sx={{ fontFamily: "Regular_W", fontSize: "13px" }}>
+                            Upload resources, learning materials, or tasks for <strong>{selectedAssignment?.student?.name}</strong>
+                        </Alert>
 
+                        <Button
+                            variant="outlined"
+                            component="label"
+                            sx={{
+                                height: 120,
+                                borderStyle: "dashed",
+                                borderWidth: 2,
+                                borderColor: "var(--webprimary)",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 1
+                            }}
+                        >
+                            <MdUpload size={40} color="var(--webprimary)" />
+                            <Typography sx={{ fontFamily: "Medium_W", fontSize: "14px", color: "var(--webprimary)" }}>
+                                Click to Select Files
+                            </Typography>
+                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "11px", color: "var(--greyText)" }}>
+                                PDF, Documents, Videos, Source Code
+                            </Typography>
+                            <input type="file" hidden multiple onChange={handleFileChange} />
+                        </Button>
+
+                        {uploadFiles.length > 0 && (
+                            <Box sx={{
+                                maxHeight: 250,
+                                overflowY: "auto",
+                                border: "1px solid #e0e0e0",
+                                borderRadius: "8px"
+                            }}>
+                                <Typography sx={{
+                                    fontFamily: "SemiBold_W",
+                                    fontSize: "12px",
+                                    p: 1.5,
+                                    bgcolor: "#f8f9fa",
+                                    borderBottom: "1px solid #e0e0e0"
+                                }}>
+                                    {uploadFiles.length} File{uploadFiles.length > 1 ? "s" : ""} Selected
+                                </Typography>
+                                {uploadFiles.map((file: File, index: number) => (
+                                    <Box
+                                        key={index}
+                                        sx={{
+                                            display: "flex",
+                                            gap: 1.5,
+                                            alignItems: "center",
+                                            p: 1.5,
+                                            borderBottom: index < uploadFiles.length - 1 ? "1px solid #f0f0f0" : "none",
+                                            "&:hover": { bgcolor: "#fafafa" }
+                                        }}
+                                    >
+                                        <MdAssignment size={20} color="var(--webprimary)" />
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                                            <Typography sx={{
+                                                fontFamily: "Medium_W",
+                                                fontSize: "13px",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap"
+                                            }}>
+                                                {file.name}
+                                            </Typography>
+                                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "11px", color: "var(--greyText)" }}>
+                                                {(file.size / 1024).toFixed(1)} KB
+                                            </Typography>
+                                        </Box>
+                                        <TextField
+                                            select
+                                            size="small"
+                                            value={fileTypes[index] || "other"}
+                                            onChange={(e) => handleFileTypeChange(index, e.target.value)}
+                                            sx={{ width: 140, "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "12px" } }}
+                                        >
+                                            <MenuItem value="learning-material">📚 Learning Material</MenuItem>
+                                            <MenuItem value="task">📝 Task</MenuItem>
+                                            <MenuItem value="video">🎬 Video</MenuItem>
+                                            <MenuItem value="notes">📄 Notes</MenuItem>
+                                            <MenuItem value="source-code">💻 Source Code</MenuItem>
+                                            <MenuItem value="other">📎 Other</MenuItem>
+                                        </TextField>
+                                        <IconButton size="small" onClick={() => handleRemoveFile(index)} sx={{ color: "#ef4444" }}>
+                                            <MdDelete />
+                                        </IconButton>
+                                    </Box>
+                                ))}
+                            </Box>
+                        )}
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, borderTop: "1px solid #e0e0e0", gap: 1 }}>
+                    <Button onClick={() => setUploadModal(false)} sx={{ fontFamily: "Medium_W", fontSize: "12px" }}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => uploadFilesMutation.mutate(selectedAssignment?._id)}
+                        disabled={uploadFiles.length === 0 || uploadFilesMutation.isPending}
+                        sx={{
+                            fontFamily: "Medium_W",
+                            fontSize: "12px",
+                            bgcolor: "var(--webprimary)",
+                            "&:hover": { bgcolor: "var(--webprimary)", opacity: 0.9 }
+                        }}
+                    >
+                        {uploadFilesMutation.isPending ? "Uploading..." : `Upload ${uploadFiles.length} File${uploadFiles.length !== 1 ? "s" : ""}`}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* View Files Modal - Premium Design */}
+            <Dialog open={viewFilesModal} onClose={() => setViewFilesModal(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{
+                    fontFamily: "SemiBold_W",
+                    fontSize: "18px",
+                    borderBottom: "1px solid #e0e0e0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1
+                }}>
+                    <MdAssignment /> Files & Resources
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 2 }}>
+                        <Typography sx={{
+                            fontFamily: "SemiBold_W",
+                            fontSize: "14px",
+                            mb: 1.5,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1
+                        }}>
+                            <MdUpload color="var(--webprimary)" /> Internship Materials
+                            <Chip
+                                label={selectedAssignment?.deliveryFiles?.length || 0}
+                                size="small"
+                                sx={{ fontFamily: "Medium_W", fontSize: "11px", height: 20 }}
+                            />
+                        </Typography>
+                        {selectedAssignment?.deliveryFiles?.length > 0 ? (
+                            <Box sx={{ border: "1px solid #e0e0e0", borderRadius: "8px", maxHeight: 200, overflowY: "auto" }}>
+                                {selectedAssignment.deliveryFiles.map((file: any, index: number) => (
+                                    <Box
+                                        key={index}
+                                        sx={{
+                                            p: 1.5,
+                                            borderBottom: index < selectedAssignment.deliveryFiles.length - 1 ? "1px solid #f0f0f0" : "none",
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            "&:hover": { bgcolor: "#fafafa" }
+                                        }}
+                                    >
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                                            <MdDownload size={18} color="var(--webprimary)" />
+                                            <Box>
+                                                <Typography sx={{ fontFamily: "Medium_W", fontSize: "13px" }}>{file.fileName}</Typography>
+                                                <Chip
+                                                    label={file.fileType?.replace("-", " ")}
+                                                    size="small"
+                                                    sx={{ fontFamily: "Regular_W", fontSize: "10px", height: 18, textTransform: "capitalize" }}
+                                                />
+                                            </Box>
+                                        </Box>
+                                        <Button
+                                            size="small"
+                                            href={file.filePath}
+                                            target="_blank"
+                                            startIcon={<MdDownload />}
+                                            sx={{ fontFamily: "Medium_W", fontSize: "11px" }}
+                                        >
+                                            Download
+                                        </Button>
+                                    </Box>
+                                ))}
+                            </Box>
+                        ) : (
+                            <Box sx={{ p: 3, textAlign: "center", bgcolor: "#f8f9fa", borderRadius: "8px" }}>
+                                <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px", color: "var(--greyText)" }}>
+                                    No materials uploaded yet.
+                                </Typography>
+                            </Box>
+                        )}
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, borderTop: "1px solid #e0e0e0" }}>
+                    <Button onClick={() => setViewFilesModal(false)} sx={{ fontFamily: "Medium_W", fontSize: "12px" }}>
+                        Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Certificate Modal */}
+            <Dialog open={certificateModal} onClose={() => setCertificateModal(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ fontFamily: "SemiBold_W", fontSize: "18px", borderBottom: "1px solid #e0e0e0" }}>
+                    Complete & Issue Certificate
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+                        <Alert severity="success" sx={{ fontFamily: "Regular_W", fontSize: "13px" }}>
+                            This will mark the internship as <strong>Completed</strong> for {selectedAssignment?.student?.name}
+                        </Alert>
+                        <Button
+                            variant="contained"
+                            color="success"
+                            onClick={handleGenerateCertificate}
+                            disabled={generating}
+                            startIcon={<MdSchool />}
+                            sx={{ fontFamily: "Medium_W", py: 1.5 }}
+                        >
+                            {generating ? "Generating Certificate..." : "Generate Certificate & Complete"}
+                        </Button>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setCertificateModal(false)} sx={{ fontFamily: "Medium_W", fontSize: "12px" }}>Cancel</Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Hidden Certificate Template for Generation */}
             < Box sx={{ position: "absolute", left: "-3000px", top: 0 }}>

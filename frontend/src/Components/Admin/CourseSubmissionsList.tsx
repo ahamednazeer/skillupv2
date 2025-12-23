@@ -48,6 +48,7 @@ import msme from "../../assets/Images/msms.png";
 import iso from "../../assets/Images/isonew.png";
 import iaf from "../../assets/Images/iaf.png";
 import sign from "../../assets/Images/dummysign.png";
+import { useGenerateInvoice } from "../../Hooks/payment";
 
 const CourseSubmissionsList = () => {
     const token = Cookies.get("skToken");
@@ -67,8 +68,7 @@ const CourseSubmissionsList = () => {
     // Payment State
     const [paymentModal, setPaymentModal] = useState(false);
     const [paymentForm, setPaymentForm] = useState<{ amount: string | number; notes: string }>({ amount: "", notes: "" });
-    const [generatingInvoice, setGeneratingInvoice] = useState(false);
-    const invoiceRef = useRef<HTMLDivElement>(null);
+    const generateInvoiceMutation = useGenerateInvoice();
 
     // Upload Form State
     const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -109,28 +109,23 @@ const CourseSubmissionsList = () => {
     };
 
     const handleGenerateInvoice = async (item: any) => {
-        if (!invoiceRef.current) return;
-        setSelectedAssignment(item); // Ensure correct item is waiting
-        setGeneratingInvoice(true);
-        // Small delay to allow state update if needed, though mostly synchronous here
-        setTimeout(async () => {
-            try {
-                if (!invoiceRef.current) return;
-                const canvas = await html2canvas(invoiceRef.current, { scale: 2 });
-                const imgData = canvas.toDataURL("image/png");
-                const pdf = new jsPDF("p", "mm", "a4");
-                const width = pdf.internal.pageSize.getWidth();
-                const height = (canvas.height * width) / canvas.width;
-                pdf.addImage(imgData, "PNG", 0, 0, width, height);
-                pdf.save(`${item.student.name}_Invoice.pdf`);
+        // Check if invoice already exists
+        if (item.invoice?.url) {
+            window.open(item.invoice.url, "_blank");
+            return;
+        }
+        // Generate new invoice via API
+        generateInvoiceMutation.mutate(item._id, {
+            onSuccess: (data: any) => {
                 CustomSnackBar.successSnackbar("Invoice generated!");
-            } catch (err) {
-                console.error("Invoice Error:", err);
-                CustomSnackBar.errorSnackbar("Failed to generate invoice");
-            } finally {
-                setGeneratingInvoice(false);
+                if (data.invoice?.url) {
+                    window.open(data.invoice.url, "_blank");
+                }
+            },
+            onError: (err: any) => {
+                CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed to generate invoice");
             }
-        }, 500);
+        });
     };
 
     // Fetch assignments
@@ -205,21 +200,6 @@ const CourseSubmissionsList = () => {
             setPaymentForm({ amount: 0, notes: "" });
         },
         onError: (err: any) => CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed to request payment"),
-    });
-
-    const markPaidMutation = useMutation({
-        mutationFn: async (id: string) => {
-            await axios.post(
-                `${import.meta.env.VITE_APP_BASE_URL}admin/course-assignments/${id}/mark-paid`,
-                {},
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-        },
-        onSuccess: () => {
-            CustomSnackBar.successSnackbar("Marked as Paid!");
-            queryClient.invalidateQueries({ queryKey: ["course-assignments"] });
-        },
-        onError: (err: any) => CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed to mark paid"),
     });
 
     // Handlers
@@ -345,27 +325,15 @@ const CourseSubmissionsList = () => {
                                                     </IconButton>
                                                 </Tooltip>
                                             )}
-                                            {row.payment?.status === "pending" && (
-                                                <Button
-                                                    size="small"
-                                                    variant="contained"
-                                                    color="success"
-                                                    onClick={() => markPaidMutation.mutate(row._id)}
-                                                    disabled={markPaidMutation.isPending}
-                                                    sx={{ fontSize: "0.7rem", py: 0.5 }}
-                                                >
-                                                    Mark Paid
-                                                </Button>
-                                            )}
                                             {row.payment?.status === "paid" && (
-                                                <Tooltip title="Download Invoice">
+                                                <Tooltip title={row.invoice?.url ? "Download Invoice" : "Generate Invoice"}>
                                                     <IconButton
                                                         size="small"
                                                         color="primary"
                                                         onClick={() => handleGenerateInvoice(row)}
-                                                        disabled={generatingInvoice && selectedAssignment?._id === row._id}
+                                                        disabled={generateInvoiceMutation.isPending}
                                                     >
-                                                        {generatingInvoice && selectedAssignment?._id === row._id ? <CircularProgress size={20} /> : <MdPayment />}
+                                                        {generateInvoiceMutation.isPending ? <CircularProgress size={20} /> : <MdPayment />}
                                                     </IconButton>
                                                 </Tooltip>
                                             )}
@@ -403,91 +371,311 @@ const CourseSubmissionsList = () => {
                 </TableContainer>
             </Card>
 
-            {/* Upload Modal (Multi-file) */}
+            {/* Upload Modal (Multi-file) - Premium Design */}
             <Dialog open={uploadModal} onClose={() => setUploadModal(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Upload Course Files</DialogTitle>
+                <DialogTitle sx={{
+                    fontFamily: "SemiBold_W",
+                    fontSize: "18px",
+                    borderBottom: "1px solid #e0e0e0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1
+                }}>
+                    <MdUpload /> Upload Course Materials
+                </DialogTitle>
                 <DialogContent>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
-                        <Alert severity="info">Upload materials, resources, or files for the student.</Alert>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+                        <Alert severity="info" sx={{ fontFamily: "Regular_W", fontSize: "13px" }}>
+                            Upload study materials, resources, or assignments for <strong>{selectedAssignment?.student?.name}</strong>
+                        </Alert>
 
-                        <Button variant="outlined" component="label" startIcon={<MdUpload />} fullWidth>
-                            Select Files
+                        {/* Drag & Drop Area */}
+                        <Button
+                            variant="outlined"
+                            component="label"
+                            sx={{
+                                height: 120,
+                                borderStyle: "dashed",
+                                borderWidth: 2,
+                                borderColor: "var(--webprimary)",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 1,
+                                fontFamily: "Regular_W",
+                                "&:hover": {
+                                    bgcolor: "rgba(var(--webprimary-rgb), 0.05)",
+                                    borderColor: "var(--webprimary)"
+                                }
+                            }}
+                        >
+                            <MdUpload size={40} color="var(--webprimary)" />
+                            <Typography sx={{ fontFamily: "Medium_W", fontSize: "14px", color: "var(--webprimary)" }}>
+                                Click to Select Files
+                            </Typography>
+                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "11px", color: "var(--greyText)" }}>
+                                PDF, Documents, Videos, Source Code
+                            </Typography>
                             <input type="file" hidden multiple onChange={handleFileChange} />
                         </Button>
 
-                        <Box sx={{ maxHeight: 200, overflowY: "auto" }}>
-                            {uploadFiles.map((file, index) => (
-                                <Box key={index} sx={{ display: "flex", gap: 1, alignItems: "center", mb: 1, p: 1, border: "1px solid #eee", borderRadius: 1 }}>
-                                    <Typography variant="body2" sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{file.name}</Typography>
-                                    <TextField
-                                        select
-                                        size="small"
-                                        value={fileTypes[index] || "other"}
-                                        onChange={(e) => handleFileTypeChange(index, e.target.value)}
-                                        sx={{ width: 120 }}
+                        {/* File List */}
+                        {uploadFiles.length > 0 && (
+                            <Box sx={{
+                                maxHeight: 250,
+                                overflowY: "auto",
+                                border: "1px solid #e0e0e0",
+                                borderRadius: "8px"
+                            }}>
+                                <Typography sx={{
+                                    fontFamily: "SemiBold_W",
+                                    fontSize: "12px",
+                                    p: 1.5,
+                                    bgcolor: "#f8f9fa",
+                                    borderBottom: "1px solid #e0e0e0"
+                                }}>
+                                    {uploadFiles.length} File{uploadFiles.length > 1 ? "s" : ""} Selected
+                                </Typography>
+                                {uploadFiles.map((file, index) => (
+                                    <Box
+                                        key={index}
+                                        sx={{
+                                            display: "flex",
+                                            gap: 1.5,
+                                            alignItems: "center",
+                                            p: 1.5,
+                                            borderBottom: index < uploadFiles.length - 1 ? "1px solid #f0f0f0" : "none",
+                                            "&:hover": { bgcolor: "#fafafa" }
+                                        }}
                                     >
-                                        <MenuItem value="course-material">Course Material</MenuItem>
-                                        <MenuItem value="assignment">Assignment</MenuItem>
-                                        <MenuItem value="other">Other</MenuItem>
-                                    </TextField>
-                                    <IconButton size="small" onClick={() => handleRemoveFile(index)} color="error"><MdDelete /></IconButton>
-                                </Box>
-                            ))}
-                        </Box>
+                                        <MdAssignment size={20} color="var(--webprimary)" />
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                                            <Typography sx={{
+                                                fontFamily: "Medium_W",
+                                                fontSize: "13px",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap"
+                                            }}>
+                                                {file.name}
+                                            </Typography>
+                                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "11px", color: "var(--greyText)" }}>
+                                                {(file.size / 1024).toFixed(1)} KB
+                                            </Typography>
+                                        </Box>
+                                        <TextField
+                                            select
+                                            size="small"
+                                            value={fileTypes[index] || "other"}
+                                            onChange={(e) => handleFileTypeChange(index, e.target.value)}
+                                            sx={{
+                                                width: 140,
+                                                "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "12px" }
+                                            }}
+                                        >
+                                            <MenuItem value="course-material">📚 Course Material</MenuItem>
+                                            <MenuItem value="assignment">📝 Assignment</MenuItem>
+                                            <MenuItem value="video">🎬 Video</MenuItem>
+                                            <MenuItem value="notes">📄 Notes</MenuItem>
+                                            <MenuItem value="presentation">📊 Presentation</MenuItem>
+                                            <MenuItem value="source-code">💻 Source Code</MenuItem>
+                                            <MenuItem value="other">📎 Other</MenuItem>
+                                        </TextField>
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => handleRemoveFile(index)}
+                                            sx={{ color: "#ef4444" }}
+                                        >
+                                            <MdDelete />
+                                        </IconButton>
+                                    </Box>
+                                ))}
+                            </Box>
+                        )}
                     </Box>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setUploadModal(false)}>Cancel</Button>
+                <DialogActions sx={{ p: 2, borderTop: "1px solid #e0e0e0", gap: 1 }}>
+                    <Button
+                        onClick={() => setUploadModal(false)}
+                        sx={{ fontFamily: "Medium_W", fontSize: "12px" }}
+                    >
+                        Cancel
+                    </Button>
                     <Button
                         variant="contained"
                         onClick={() => uploadFilesMutation.mutate(selectedAssignment?._id)}
                         disabled={uploadFiles.length === 0 || uploadFilesMutation.isPending}
+                        sx={{
+                            fontFamily: "Medium_W",
+                            fontSize: "12px",
+                            bgcolor: "var(--webprimary)",
+                            "&:hover": { bgcolor: "var(--webprimary)", opacity: 0.9 }
+                        }}
                     >
-                        {uploadFilesMutation.isPending ? "Uploading..." : "Upload Files"}
+                        {uploadFilesMutation.isPending ? "Uploading..." : `Upload ${uploadFiles.length} File${uploadFiles.length !== 1 ? "s" : ""}`}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* View Files Modal */}
+            {/* View Files Modal - Premium Design */}
             <Dialog open={viewFilesModal} onClose={() => setViewFilesModal(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Files & Submissions</DialogTitle>
+                <DialogTitle sx={{
+                    fontFamily: "SemiBold_W",
+                    fontSize: "18px",
+                    borderBottom: "1px solid #e0e0e0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1
+                }}>
+                    <MdAssignment /> Files & Submissions
+                </DialogTitle>
                 <DialogContent>
-                    <Typography variant="subtitle2" sx={{ mt: 1, mb: 1 }} fontWeight="bold">Course Files (Admin Uploads)</Typography>
-                    {selectedAssignment?.deliveryFiles?.length > 0 ? (
-                        <Box sx={{ maxHeight: 150, overflowY: "auto", mb: 2 }}>
-                            {selectedAssignment.deliveryFiles.map((file: any, index: number) => (
-                                <Box key={index} sx={{ p: 1, borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <Box>
-                                        <Typography variant="body2">{file.fileName}</Typography>
-                                        <Chip label={file.fileType} size="small" sx={{ fontSize: "0.7rem", height: 20 }} />
+                    {/* Admin Uploaded Files */}
+                    <Box sx={{ mt: 2 }}>
+                        <Typography sx={{
+                            fontFamily: "SemiBold_W",
+                            fontSize: "14px",
+                            mb: 1.5,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1
+                        }}>
+                            <MdUpload color="var(--webprimary)" /> Course Materials
+                            <Chip
+                                label={selectedAssignment?.deliveryFiles?.length || 0}
+                                size="small"
+                                sx={{ fontFamily: "Medium_W", fontSize: "11px", height: 20 }}
+                            />
+                        </Typography>
+                        {selectedAssignment?.deliveryFiles?.length > 0 ? (
+                            <Box sx={{
+                                border: "1px solid #e0e0e0",
+                                borderRadius: "8px",
+                                maxHeight: 180,
+                                overflowY: "auto"
+                            }}>
+                                {selectedAssignment.deliveryFiles.map((file: any, index: number) => (
+                                    <Box
+                                        key={index}
+                                        sx={{
+                                            p: 1.5,
+                                            borderBottom: index < selectedAssignment.deliveryFiles.length - 1 ? "1px solid #f0f0f0" : "none",
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            "&:hover": { bgcolor: "#fafafa" }
+                                        }}
+                                    >
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                                            <MdDownload size={18} color="var(--webprimary)" />
+                                            <Box>
+                                                <Typography sx={{ fontFamily: "Medium_W", fontSize: "13px" }}>{file.fileName}</Typography>
+                                                <Chip
+                                                    label={file.fileType?.replace("-", " ")}
+                                                    size="small"
+                                                    sx={{
+                                                        fontFamily: "Regular_W",
+                                                        fontSize: "10px",
+                                                        height: 18,
+                                                        textTransform: "capitalize"
+                                                    }}
+                                                />
+                                            </Box>
+                                        </Box>
+                                        <Button
+                                            size="small"
+                                            href={file.filePath}
+                                            target="_blank"
+                                            startIcon={<MdDownload />}
+                                            sx={{ fontFamily: "Medium_W", fontSize: "11px" }}
+                                        >
+                                            Download
+                                        </Button>
                                     </Box>
-                                    <Button size="small" href={file.filePath} target="_blank" startIcon={<MdDownload />}>Download</Button>
-                                </Box>
-                            ))}
-                        </Box>
-                    ) : (
-                        <Typography variant="body2" color="text.secondary">No admin files uploaded.</Typography>
-                    )}
+                                ))}
+                            </Box>
+                        ) : (
+                            <Box sx={{ p: 3, textAlign: "center", bgcolor: "#f8f9fa", borderRadius: "8px" }}>
+                                <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px", color: "var(--greyText)" }}>
+                                    No materials uploaded yet.
+                                </Typography>
+                            </Box>
+                        )}
+                    </Box>
 
-                    <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }} fontWeight="bold">Student Submissions</Typography>
-                    {selectedAssignment?.courseSubmissions?.length > 0 ? (
-                        <Box sx={{ maxHeight: 150, overflowY: "auto", mb: 2 }}>
-                            {selectedAssignment.courseSubmissions.map((file: any, index: number) => (
-                                <Box key={index} sx={{ p: 1, borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <Box>
-                                        <Typography variant="body2">{file.fileName}</Typography>
-                                        <Typography variant="caption" color="text.secondary">By: {file.uploadedByRole}</Typography>
+                    {/* Student Submissions */}
+                    <Box sx={{ mt: 3 }}>
+                        <Typography sx={{
+                            fontFamily: "SemiBold_W",
+                            fontSize: "14px",
+                            mb: 1.5,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1
+                        }}>
+                            <MdPerson color="#22c55e" /> Student Submissions
+                            <Chip
+                                label={selectedAssignment?.courseSubmissions?.length || 0}
+                                size="small"
+                                color="success"
+                                sx={{ fontFamily: "Medium_W", fontSize: "11px", height: 20 }}
+                            />
+                        </Typography>
+                        {selectedAssignment?.courseSubmissions?.length > 0 ? (
+                            <Box sx={{
+                                border: "1px solid #e0e0e0",
+                                borderRadius: "8px",
+                                maxHeight: 180,
+                                overflowY: "auto"
+                            }}>
+                                {selectedAssignment.courseSubmissions.map((file: any, index: number) => (
+                                    <Box
+                                        key={index}
+                                        sx={{
+                                            p: 1.5,
+                                            borderBottom: index < selectedAssignment.courseSubmissions.length - 1 ? "1px solid #f0f0f0" : "none",
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            "&:hover": { bgcolor: "#fafafa" }
+                                        }}
+                                    >
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                                            <MdAssignment size={18} color="#22c55e" />
+                                            <Box>
+                                                <Typography sx={{ fontFamily: "Medium_W", fontSize: "13px" }}>{file.fileName}</Typography>
+                                                <Typography sx={{ fontFamily: "Regular_W", fontSize: "11px", color: "var(--greyText)" }}>
+                                                    Submitted by Student
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                        <Button
+                                            size="small"
+                                            href={file.filePath}
+                                            target="_blank"
+                                            startIcon={<MdDownload />}
+                                            sx={{ fontFamily: "Medium_W", fontSize: "11px" }}
+                                        >
+                                            Download
+                                        </Button>
                                     </Box>
-                                    <Button size="small" href={file.filePath} target="_blank" startIcon={<MdDownload />}>Download</Button>
-                                </Box>
-                            ))}
-                        </Box>
-                    ) : (
-                        <Typography variant="body2" color="text.secondary">No submissions found.</Typography>
-                    )}
+                                ))}
+                            </Box>
+                        ) : (
+                            <Box sx={{ p: 3, textAlign: "center", bgcolor: "#f8f9fa", borderRadius: "8px" }}>
+                                <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px", color: "var(--greyText)" }}>
+                                    No submissions from student yet.
+                                </Typography>
+                            </Box>
+                        )}
+                    </Box>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setViewFilesModal(false)}>Close</Button>
+                <DialogActions sx={{ p: 2, borderTop: "1px solid #e0e0e0" }}>
+                    <Button
+                        onClick={() => setViewFilesModal(false)}
+                        sx={{ fontFamily: "Medium_W", fontSize: "12px" }}
+                    >
+                        Close
+                    </Button>
                 </DialogActions>
             </Dialog>
 
@@ -548,91 +736,6 @@ const CourseSubmissionsList = () => {
                     <Button variant="contained" onClick={() => requestPaymentMutation.mutate()} disabled={requestPaymentMutation.isPending}>Request</Button>
                 </DialogActions>
             </Dialog>
-
-            {/* Hidden Invoice Template */}
-            <Box sx={{ position: "absolute", left: "-3000px", top: 0 }}>
-                <Paper
-                    ref={invoiceRef}
-                    elevation={0}
-                    sx={{
-                        width: "210mm", // A4 width
-                        minHeight: "297mm",
-                        padding: "40px",
-                        backgroundColor: "#fff",
-                        fontFamily: "'Roboto', sans-serif",
-                        color: "#333",
-                        boxSizing: "border-box"
-                    }}
-                >
-                    {/* Header */}
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 4, borderBottom: "2px solid #eee", pb: 2 }}>
-                        <Box>
-                            <img src={logo} alt="Logo" style={{ height: "60px", marginBottom: "10px" }} />
-                            <Typography variant="h6" fontWeight="bold" color="primary">Skill Up Tech Solutions</Typography>
-                            <Typography variant="body2">Plot No. 10, 2nd Floor, Somewhere Street</Typography>
-                            <Typography variant="body2">City, State - Zip Code</Typography>
-                            <Typography variant="body2">Email: contact@skilluptech.com</Typography>
-                        </Box>
-                        <Box sx={{ textAlign: "right" }}>
-                            <Typography variant="h3" fontWeight="bold" color="#ccc" sx={{ letterSpacing: 2 }}>INVOICE</Typography>
-                            <Typography variant="body1" fontWeight="bold" sx={{ mt: 2 }}>Order # {selectedAssignment?.payment?.transactionId || Date.now().toString().slice(-6)}</Typography>
-                            <Typography variant="body2">Date: {new Date().toLocaleDateString()}</Typography>
-                        </Box>
-                    </Box>
-
-                    {/* Bill To */}
-                    <Box sx={{ mb: 4 }}>
-                        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1, color: "#555" }}>Bill To:</Typography>
-                        <Typography variant="h6" fontWeight="bold">{selectedAssignment?.student?.name}</Typography>
-                        <Typography variant="body2">{selectedAssignment?.student?.email}</Typography>
-                    </Box>
-
-                    {/* Table */}
-                    <Box sx={{ width: "100%", mb: 4 }}>
-                        <Box sx={{ display: "flex", bgcolor: "#f1f5f9", p: 1.5, borderRadius: 1 }}>
-                            <Typography sx={{ flex: 3, fontWeight: "bold" }}>Description</Typography>
-                            <Typography sx={{ flex: 1, textAlign: "center", fontWeight: "bold" }}>Qty</Typography>
-                            <Typography sx={{ flex: 1, textAlign: "right", fontWeight: "bold" }}>Price</Typography>
-                            <Typography sx={{ flex: 1, textAlign: "right", fontWeight: "bold" }}>Total</Typography>
-                        </Box>
-                        <Box sx={{ display: "flex", p: 1.5, borderBottom: "1px solid #eee" }}>
-                            <Typography sx={{ flex: 3 }}>
-                                Course Fee: <strong>{selectedAssignment?.itemId?.name}</strong>
-                                {selectedAssignment?.payment?.notes && <span style={{ display: "block", fontSize: "0.8em", color: "#666" }}>{selectedAssignment.payment.notes}</span>}
-                            </Typography>
-                            <Typography sx={{ flex: 1, textAlign: "center" }}>1</Typography>
-                            <Typography sx={{ flex: 1, textAlign: "right" }}>₹{selectedAssignment?.payment?.amount}</Typography>
-                            <Typography sx={{ flex: 1, textAlign: "right" }}>₹{selectedAssignment?.payment?.amount}</Typography>
-                        </Box>
-                    </Box>
-
-                    {/* Total */}
-                    <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 6 }}>
-                        <Box sx={{ width: "250px" }}>
-                            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                                <Typography>Subtotal:</Typography>
-                                <Typography>₹{selectedAssignment?.payment?.amount}</Typography>
-                            </Box>
-                            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1, fontWeight: "bold", fontSize: "1.2rem", borderTop: "2px solid #333", pt: 1 }}>
-                                <Typography>Total:</Typography>
-                                <Typography>₹{selectedAssignment?.payment?.amount}</Typography>
-                            </Box>
-                        </Box>
-                    </Box>
-
-                    {/* Footer */}
-                    <Box sx={{ mt: "auto", pt: 4, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                        <Box>
-                            <Typography variant="h6" fontWeight="bold">Thank you for your business!</Typography>
-                            <Typography variant="caption" color="text.secondary">If you have any questions, please contact support.</Typography>
-                        </Box>
-                        <div style={{ textAlign: "center" }}>
-                            <img src={sign} alt="Sign" style={{ width: "100px" }} />
-                            <Typography variant="body2" fontWeight="bold">Authorized Signature</Typography>
-                        </div>
-                    </Box>
-                </Paper>
-            </Box>
 
             {/* Hidden Certificate Template for Generation */}
             <Box sx={{ position: "absolute", left: "-3000px", top: 0 }}>

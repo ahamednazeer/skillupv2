@@ -50,3 +50,76 @@ export const useUploadPaymentQR = () => {
         onSuccess: () => qc.invalidateQueries({ queryKey: ["adminPaymentSettings"] })
     })
 };
+
+// ===== Payment Management Hooks =====
+
+// Get all pending payments (admin)
+export const useGetPendingPayments = (filters?: { status?: string; itemType?: string }) => {
+    return useQuery({
+        queryKey: ["pendingPayments", filters],
+        queryFn: async () => {
+            const params = new URLSearchParams();
+            if (filters?.status) params.append("status", filters.status);
+            if (filters?.itemType) params.append("itemType", filters.itemType);
+            const response = await axios.get(`${BASE_URL}admin/pending-payments?${params.toString()}`, getAuthHeader());
+            return response.data;
+        },
+    });
+};
+
+// Mark payment as paid (admin)
+export const useMarkPaymentPaid = () => {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ assignmentId, transactionId, notes }: { assignmentId: string; transactionId?: string; notes?: string }) => {
+            const response = await axios.put(`${BASE_URL}admin/assignments/${assignmentId}/mark-paid`, { transactionId, notes }, getAuthHeader());
+            return response.data;
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ["pendingPayments"] });
+            qc.invalidateQueries({ queryKey: ["assignments"] });
+            // Sync payment status across all management pages
+            qc.invalidateQueries({ queryKey: ["course-assignments"] });
+            qc.invalidateQueries({ queryKey: ["project-requirements"] });
+            qc.invalidateQueries({ queryKey: ["internship-assignments"] });
+        }
+    });
+};
+
+// Upload payment proof (student)
+export const useUploadPaymentProof = () => {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ assignmentId, formData }: { assignmentId: string; formData: FormData }) => {
+            const response = await axios.post(
+                `${BASE_URL}student/assignments/${assignmentId}/upload-payment-proof`,
+                formData,
+                { headers: { Authorization: `Bearer ${Cookies.get("skToken")}`, "Content-Type": "multipart/form-data" } }
+            );
+            return response.data;
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ["my-courses"] });
+            qc.invalidateQueries({ queryKey: ["my-projects"] });
+            qc.invalidateQueries({ queryKey: ["my-internships"] });
+        }
+    });
+};
+
+// Generate invoice (admin)
+export const useGenerateInvoice = () => {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: async (assignmentId: string) => {
+            const response = await axios.post(
+                `${BASE_URL}admin/assignments/${assignmentId}/generate-invoice`,
+                {},
+                getAuthHeader()
+            );
+            return response.data;
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ["pendingPayments"] });
+        }
+    });
+};

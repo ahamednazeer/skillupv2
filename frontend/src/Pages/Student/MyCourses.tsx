@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import {
     Box,
     Typography,
@@ -6,46 +6,53 @@ import {
     Alert,
     Card,
     CardContent,
-    LinearProgress,
     Chip,
     Button,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogActions,
-    List,
-    ListItem,
-    ListItemText,
-    ListItemIcon,
-    Divider,
     TextField,
     IconButton,
-    Grid
+    Divider,
+    Stack,
 } from "@mui/material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Cookies from "js-cookie";
-import { useGetPaymentSettings } from "../../Hooks/payment";
-import { MdDownload, MdUpload, MdDescription, MdDateRange, MdPerson, MdAttachFile, MdPayment, MdCheck, MdAccessTime } from "react-icons/md";
+import { useGetPaymentSettings, useUploadPaymentProof } from "../../Hooks/payment";
+import {
+    MdDownload,
+    MdUpload,
+    MdPayment,
+    MdSchool,
+    MdAccessTime,
+    MdPerson,
+    MdCalendarToday,
+    MdDescription,
+    MdCloudDownload,
+    MdCheckCircle,
+} from "react-icons/md";
+import { IoClose } from "react-icons/io5";
 import CustomSnackBar from "../../Custom/CustomSnackBar";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
-import logo from "../../assets/Images/blacklogo.png";
-import sign from "../../assets/Images/dummysign.png";
-import { submitButtonStyle } from "../../assets/Styles/ButtonStyles";
 import config from "../../Config/Config";
+import { primaryButtonStyle, outlinedButtonStyle, dangerButtonStyle } from "../../assets/Styles/ButtonStyles";
 
 const MyCourses = () => {
     const token = Cookies.get("skToken");
     const queryClient = useQueryClient();
 
     const [selectedCourse, setSelectedCourse] = useState<any>(null);
-    const [detailsModal, setDetailsModal] = useState(false);
     const [uploadModal, setUploadModal] = useState(false);
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [notes, setNotes] = useState("");
-    const [generatingInvoice, setGeneratingInvoice] = useState(false);
-    const invoiceRef = useRef<HTMLDivElement>(null);
+
+    // Payment proof upload state
+    const [paymentProofModal, setPaymentProofModal] = useState(false);
+    const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState("");
+    const [transactionId, setTransactionId] = useState("");
+    const paymentProofMutation = useUploadPaymentProof();
 
     const { data, isLoading, error } = useQuery({
         queryKey: ["my-courses"],
@@ -78,51 +85,9 @@ const MyCourses = () => {
             setUploadModal(false);
             setUploadFile(null);
             setNotes("");
-            // Refresh selected course data
-            const updated = data.find((c: any) => c._id === selectedCourse._id);
-            if (updated) setSelectedCourse(updated);
         },
         onError: (err: any) => CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed to upload"),
     });
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "completed": return "success";
-            case "in-progress": return "primary";
-            default: return "default";
-        }
-    };
-
-    // Calculate progress based on start and end dates
-    const calculateProgress = (startDate: string | undefined, endDate: string | undefined, status: string): number => {
-        // If course is completed, return 100%
-        if (status === "completed") return 100;
-
-        // If no dates provided, return 0
-        if (!startDate || !endDate) return 0;
-
-        const start = new Date(startDate).getTime();
-        const end = new Date(endDate).getTime();
-        const now = new Date().getTime();
-
-        // If course hasn't started yet
-        if (now < start) return 0;
-
-        // If course has ended
-        if (now >= end) return 100;
-
-        // Calculate progress as percentage between start and end dates
-        const totalDuration = end - start;
-        const elapsedDuration = now - start;
-        const progress = Math.round((elapsedDuration / totalDuration) * 100);
-
-        return Math.min(progress, 99); // Cap at 99% until marked as completed
-    };
-
-    const handleViewDetails = (course: any) => {
-        setSelectedCourse(course);
-        setDetailsModal(true);
-    };
 
     const handleDownload = (path: string, filename: string) => {
         const link = document.createElement("a");
@@ -132,376 +97,427 @@ const MyCourses = () => {
             link.href = `${import.meta.env.VITE_APP_BASE_URL}/${path}`;
         }
         link.setAttribute("download", filename);
-        link.target = "_blank"; // Open in new tab if needed
+        link.target = "_blank";
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
-    const handleDownloadInvoice = async () => {
-        if (!invoiceRef.current) return;
-        setGeneratingInvoice(true);
-        try {
-            const canvas = await html2canvas(invoiceRef.current, { scale: 2 });
-            const imgData = canvas.toDataURL("image/png");
-            const pdf = new jsPDF("p", "mm", "a4");
-            const width = pdf.internal.pageSize.getWidth();
-            const height = (canvas.height * width) / canvas.width;
-            pdf.addImage(imgData, "PNG", 0, 0, width, height);
-            pdf.save(`${selectedCourse.itemId.name}_Invoice.pdf`);
-            CustomSnackBar.successSnackbar("Invoice downloaded!");
-        } catch (err) {
-            console.error("Invoice Error:", err);
-            CustomSnackBar.errorSnackbar("Failed to download invoice");
-        } finally {
-            setGeneratingInvoice(false);
+    // Get status badge
+    const getStatusBadge = (assignment: any) => {
+        const status = assignment.status;
+        const paymentStatus = assignment.payment?.status;
+
+        if (status === "completed") {
+            return { label: "Completed", color: "#22c55e", bg: "#f0fdf4" };
         }
+        if (paymentStatus === "pending") {
+            if (assignment.payment?.proofFile) {
+                return { label: "Payment Verifying", color: "#f59e0b", bg: "#fffbeb" };
+            }
+            return { label: "Payment Required", color: "#ef4444", bg: "#fef2f2" };
+        }
+        if (status === "in-progress") {
+            return { label: "In Progress", color: "var(--webprimary)", bg: "#eff6ff" };
+        }
+        return { label: "Enrolled", color: "#8b5cf6", bg: "#f5f3ff" };
     };
 
     if (isLoading) {
         return (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-                <CircularProgress />
+            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+                <CircularProgress sx={{ color: "var(--webprimary)" }} />
             </Box>
         );
     }
 
     if (error) {
-        return <Alert severity="error">Failed to load courses.</Alert>;
+        return (
+            <Box sx={{ p: 3 }}>
+                <Alert severity="error">Failed to load courses. Please try again.</Alert>
+            </Box>
+        );
     }
 
     return (
-        <Box sx={{ p: { xs: 2, md: 3 } }}>
-            <Typography variant="h5" fontWeight="bold" sx={{ mb: 3 }}>
-                📚 My Courses
-            </Typography>
+        <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 900, mx: "auto" }}>
+            {/* Page Header - Matching Landing Page Style */}
+            <Box sx={{ mb: 4 }}>
+                <Typography
+                    variant="h4"
+                    fontWeight="bold"
+                    gutterBottom
+                    sx={{
+                        fontFamily: "SemiBold_W",
+                        fontSize: "24px",
+                        color: "var(--title)",
+                        "@media (max-width: 768px)": { fontSize: "22px" },
+                    }}
+                >
+                    My Courses
+                </Typography>
+                <Typography sx={{ fontFamily: "Regular_W", fontSize: "14px", color: "var(--greyText)" }}>
+                    Track your learning progress and manage your course assignments
+                </Typography>
+            </Box>
 
             {!data || data.length === 0 ? (
-                <Alert severity="info">No courses assigned yet. Contact admin to get started!</Alert>
+                <Card sx={{
+                    border: "1px solid #e0e0e0",
+                    borderRadius: "10px",
+                    p: 6,
+                    textAlign: "center"
+                }}>
+                    <MdSchool size={48} color="var(--greyText)" />
+                    <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "18px", mt: 2, mb: 1 }}>
+                        No courses yet!
+                    </Typography>
+                    <Typography sx={{ fontFamily: "Regular_W", fontSize: "14px", color: "var(--greyText)" }}>
+                        Contact admin to get enrolled in courses.
+                    </Typography>
+                </Card>
             ) : (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     {data.map((assignment: any) => {
                         const course = assignment.itemId;
+                        const statusBadge = getStatusBadge(assignment);
                         const isCompleted = assignment.status === "completed";
                         const paymentPending = assignment.payment?.status === "pending";
-                        const courseProgress = calculateProgress(course?.startDate, course?.endDate, assignment.status);
+                        const canUpload = assignment.status === "in-progress" && !paymentPending;
 
                         return (
-                            <Card key={assignment._id} sx={{ borderRadius: 3, border: "1px solid #e5e7eb", overflow: "hidden", transition: "all 0.3s ease", "&:hover": { boxShadow: "0 8px 24px rgba(0,0,0,0.05)" } }}>
-                                <CardContent sx={{ p: 0 }}>
-                                    <Grid container spacing={0}>
-                                        {/* Image Section - Left (or Top on Mobile) */}
-                                        <Grid xs={12} sm={4} md={3}>
-                                            <Box
-                                                component="img"
-                                                src={course?.fileupload ? `${config.BASE_URL_MAIN}/uploads/${course.fileupload}` : "https://via.placeholder.com/300?text=Course"}
-                                                alt={course?.name}
+                            <Card key={assignment._id} sx={{
+                                border: "1px solid #e0e0e0",
+                                borderRadius: "10px",
+                                overflow: "hidden"
+                            }}>
+                                {/* Course Header with Image */}
+                                <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" } }}>
+                                    {/* Course Image */}
+                                    {course?.fileupload && (
+                                        <Box
+                                            component="img"
+                                            src={`${config.BASE_URL_MAIN}/uploads/${course.fileupload}`}
+                                            alt={course?.name}
+                                            sx={{
+                                                width: { xs: "100%", sm: 200 },
+                                                height: { xs: 150, sm: 180 },
+                                                objectFit: "cover",
+                                                flexShrink: 0
+                                            }}
+                                        />
+                                    )}
+
+                                    {/* Course Info */}
+                                    <CardContent sx={{ flex: 1, p: 3 }}>
+                                        {/* Status Badge */}
+                                        <Box sx={{ mb: 2 }}>
+                                            <Chip
+                                                label={statusBadge.label}
+                                                size="small"
                                                 sx={{
-                                                    width: "100%",
-                                                    height: { xs: 160, sm: 200, md: 220 },
-                                                    objectFit: "cover",
-                                                    borderTopLeftRadius: { xs: 12, sm: 12 },
-                                                    borderTopRightRadius: { xs: 12, sm: 0 },
-                                                    borderBottomLeftRadius: { xs: 0, sm: 12 },
+                                                    fontFamily: "Medium_W",
+                                                    fontSize: "11px",
+                                                    bgcolor: statusBadge.bg,
+                                                    color: statusBadge.color,
+                                                    border: `1px solid ${statusBadge.color}`,
+                                                    fontWeight: 600
                                                 }}
                                             />
-                                        </Grid>
+                                        </Box>
 
-                                        {/* Content Section */}
-                                        <Grid xs={12} sm={8} md={9} sx={{ p: { xs: 2, sm: 3, md: 3 }, display: "flex", flexDirection: "column" }}>
-                                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "start", flexWrap: "wrap", gap: 1, mb: 1 }}>
+                                        {/* Course Title */}
+                                        <Typography
+                                            variant="h6"
+                                            sx={{
+                                                fontFamily: "SemiBold_W",
+                                                fontSize: "18px",
+                                                color: "var(--title)",
+                                                mb: 1
+                                            }}
+                                        >
+                                            {course?.name || "Untitled Course"}
+                                        </Typography>
+
+                                        {/* Course Meta */}
+                                        <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mb: 2 }}>
+                                            {course?.trainer && (
+                                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "var(--greyText)" }}>
+                                                    <MdPerson size={14} />
+                                                    <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px" }}>{course.trainer}</Typography>
+                                                </Box>
+                                            )}
+                                            {course?.duration && (
+                                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "var(--greyText)" }}>
+                                                    <MdAccessTime size={14} />
+                                                    <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px" }}>{course.duration}</Typography>
+                                                </Box>
+                                            )}
+                                            {course?.startDate && (
+                                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "var(--greyText)" }}>
+                                                    <MdCalendarToday size={14} />
+                                                    <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px" }}>
+                                                        {new Date(course.startDate).toLocaleDateString()}
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                        </Stack>
+
+                                        {/* Description */}
+                                        {course?.description && (
+                                            <Typography sx={{
+                                                fontFamily: "Regular_W",
+                                                fontSize: "13px",
+                                                color: "var(--greyText)",
+                                                display: "-webkit-box",
+                                                WebkitLineClamp: 2,
+                                                WebkitBoxOrient: "vertical",
+                                                overflow: "hidden"
+                                            }}>
+                                                {course.description}
+                                            </Typography>
+                                        )}
+                                    </CardContent>
+                                </Box>
+
+                                <Divider />
+
+                                {/* Action Section */}
+                                <Box sx={{ p: 3 }}>
+                                    {/* PAYMENT REQUIRED */}
+                                    {paymentPending && !assignment.payment?.proofFile && (
+                                        <Box sx={{
+                                            p: 3,
+                                            bgcolor: "#fef2f2",
+                                            borderRadius: "8px",
+                                            border: "1px solid #fecaca",
+                                            mb: 2
+                                        }}>
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                                                <MdPayment color="#ef4444" size={20} />
+                                                <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "16px", color: "#dc2626" }}>
+                                                    Payment Required
+                                                </Typography>
+                                            </Box>
+
+                                            <Box sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 3,
+                                                p: 2,
+                                                bgcolor: "white",
+                                                borderRadius: "6px",
+                                                mb: 2
+                                            }}>
                                                 <Box>
-                                                    <Typography variant="h6" fontWeight="700" sx={{ lineHeight: 1.2 }}>{course?.name || "Untitled Course"}</Typography>
-                                                    <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 1, color: "text.secondary", flexWrap: "wrap" }}>
-                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                                            <MdPerson />
-                                                            <Typography variant="caption">{course?.trainer || "TBA"}</Typography>
-                                                        </Box>
-                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                                            <MdAccessTime />
-                                                            <Typography variant="caption">{course?.duration || "Flexible"}</Typography>
-                                                        </Box>
-                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                                            <MdDateRange />
-                                                            <Typography variant="caption">
-                                                                {course?.startDate ? new Date(course.startDate).toLocaleDateString() : "Date TBA"}
+                                                    <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px", color: "var(--greyText)" }}>Amount</Typography>
+                                                    <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "24px", color: "#dc2626" }}>
+                                                        ₹{assignment.payment?.amount || 0}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            {/* Payment Details */}
+                                            {paymentSettings && (
+                                                <Box sx={{ mb: 2, p: 2, bgcolor: "white", borderRadius: "6px" }}>
+                                                    <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "13px", mb: 1 }}>Payment Options:</Typography>
+                                                    {paymentSettings.enableBankTransfer && (
+                                                        <Box sx={{ mb: 1 }}>
+                                                            <Typography sx={{ fontFamily: "Medium_W", fontSize: "11px", color: "var(--greyText)", textTransform: "uppercase" }}>Bank Transfer</Typography>
+                                                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px" }}>
+                                                                {paymentSettings.bankDetails?.accountHolderName} | A/C: {paymentSettings.bankDetails?.accountNumber} | IFSC: {paymentSettings.bankDetails?.ifsc}
                                                             </Typography>
                                                         </Box>
-                                                    </Box>
+                                                    )}
+                                                    {paymentSettings.enableUPI && (
+                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                                                            <Box>
+                                                                <Typography sx={{ fontFamily: "Medium_W", fontSize: "11px", color: "var(--greyText)", textTransform: "uppercase" }}>UPI</Typography>
+                                                                <Typography sx={{ fontFamily: "Regular_W", fontSize: "12px" }}>{paymentSettings.upiId}</Typography>
+                                                            </Box>
+                                                            {paymentSettings.qrUrl && (
+                                                                <Box component="img" src={paymentSettings.qrUrl} alt="QR" sx={{ width: 60, borderRadius: "4px" }} />
+                                                            )}
+                                                        </Box>
+                                                    )}
                                                 </Box>
-                                                <Chip
-                                                    icon={isCompleted ? <MdCheck /> : <MdAccessTime />}
-                                                    label={isCompleted ? "Completed" : "In Progress"}
-                                                    color={getStatusColor(assignment.status) as any}
-                                                    size="small"
-                                                    sx={{ textTransform: "uppercase", fontWeight: "bold", fontSize: "0.7rem", height: 24 }}
-                                                />
-                                            </Box>
-
-                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                                                {course?.description || "No description available."}
-                                            </Typography>
-
-                                            {/* Progress Section */}
-                                            <Box sx={{ mb: 2 }}>
-                                                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                                                    <Typography variant="caption" fontWeight="600" color="text.secondary">Course Progress</Typography>
-                                                    <Typography variant="caption" fontWeight="bold">{courseProgress}%</Typography>
-                                                </Box>
-                                                <LinearProgress
-                                                    variant="determinate"
-                                                    value={courseProgress}
-                                                    sx={{
-                                                        height: 8,
-                                                        borderRadius: 4,
-                                                        backgroundColor: "#f1f5f9",
-                                                        "& .MuiLinearProgress-bar": {
-                                                            borderRadius: 4,
-                                                            background: isCompleted ? "#22c55e" : "linear-gradient(90deg, #3b82f6, #8b5cf6)"
-                                                        }
-                                                    }}
-                                                />
-                                            </Box>
-
-                                            {/* Alerts Area */}
-                                            {paymentPending && (
-                                                <Alert severity="warning" icon={<MdPayment fontSize="inherit" />} sx={{ mb: 2, py: 0, alignItems: "center" }}>
-                                                    <Typography variant="caption">Payment of <strong>₹{assignment.payment.amount}</strong> is pending.</Typography>
-                                                </Alert>
                                             )}
 
-                                            <Divider sx={{ mb: 2 }} />
+                                            <Button
+                                                variant="contained"
+                                                fullWidth
+                                                startIcon={<MdUpload />}
+                                                onClick={() => { setSelectedCourse(assignment); setPaymentProofModal(true); }}
+                                                sx={{ ...dangerButtonStyle, py: 1.2, fontSize: "13px" }}
+                                            >
+                                                Upload Payment Screenshot
+                                            </Button>
+                                        </Box>
+                                    )}
 
-                                            {/* Action Buttons */}
-                                            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: "auto" }}>
-                                                <Button
-                                                    variant="contained"
-                                                    onClick={() => handleViewDetails(assignment)}
-                                                    sx={{ ...submitButtonStyle, py: 0.8 }}
-                                                >
-                                                    View Details
-                                                </Button>
+                                    {/* PAYMENT VERIFYING */}
+                                    {paymentPending && assignment.payment?.proofFile && (
+                                        <Box sx={{
+                                            p: 3,
+                                            bgcolor: "#fffbeb",
+                                            borderRadius: "8px",
+                                            border: "1px solid #fcd34d",
+                                            textAlign: "center",
+                                            mb: 2
+                                        }}>
+                                            <MdAccessTime size={32} color="#f59e0b" />
+                                            <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "16px", color: "#d97706", mt: 1 }}>
+                                                Payment Under Review
+                                            </Typography>
+                                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px", color: "var(--greyText)" }}>
+                                                Your payment proof has been submitted. Admin will verify it soon.
+                                            </Typography>
+                                        </Box>
+                                    )}
 
-                                                {isCompleted && assignment.certificate?.url && (
+                                    {/* IN PROGRESS */}
+                                    {canUpload && (
+                                        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                                            <Button
+                                                variant="contained"
+                                                startIcon={<MdUpload />}
+                                                onClick={() => { setSelectedCourse(assignment); setUploadModal(true); }}
+                                                sx={{ ...primaryButtonStyle, py: 1 }}
+                                            >
+                                                Submit Assignment
+                                            </Button>
+                                        </Box>
+                                    )}
+
+                                    {/* COMPLETED */}
+                                    {isCompleted && (
+                                        <Box sx={{
+                                            p: 3,
+                                            bgcolor: "#f0fdf4",
+                                            borderRadius: "8px",
+                                            border: "1px solid #86efac",
+                                            mb: 2
+                                        }}>
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                                                <MdCheckCircle color="#22c55e" size={20} />
+                                                <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "16px", color: "#16a34a" }}>
+                                                    Course Completed!
+                                                </Typography>
+                                            </Box>
+                                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px", color: "var(--greyText)", mb: 2 }}>
+                                                Congratulations! Download your certificate below.
+                                            </Typography>
+                                            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                                                {assignment.certificate?.url && (
                                                     <Button
-                                                        variant="outlined"
-                                                        color="success"
+                                                        variant="contained"
                                                         startIcon={<MdDownload />}
                                                         onClick={() => handleDownload(assignment.certificate.url, "Certificate.pdf")}
-                                                        sx={{ py: 0.8 }}
+                                                        sx={{
+                                                            bgcolor: "#22c55e",
+                                                            color: "white",
+                                                            fontFamily: "Medium_W",
+                                                            fontSize: "12px",
+                                                            "&:hover": { bgcolor: "#16a34a" }
+                                                        }}
                                                     >
                                                         Download Certificate
                                                     </Button>
                                                 )}
-
-                                                {!isCompleted && !paymentPending && (
+                                                {assignment.invoice?.url && (
                                                     <Button
                                                         variant="outlined"
-                                                        startIcon={<MdUpload />}
-                                                        onClick={() => { setSelectedCourse(assignment); setUploadModal(true); }}
-                                                        sx={{ py: 0.8 }}
+                                                        startIcon={<MdDescription />}
+                                                        onClick={() => handleDownload(assignment.invoice.url, `Invoice_${assignment.invoice.invoiceNumber}.pdf`)}
+                                                        sx={{ ...outlinedButtonStyle }}
                                                     >
-                                                        Upload Assignment
+                                                        Download Invoice
                                                     </Button>
                                                 )}
                                             </Box>
-                                        </Grid>
-                                    </Grid>
-                                </CardContent>
+                                        </Box>
+                                    )}
+
+                                    {/* ENROLLED */}
+                                    {assignment.status === "assigned" && !paymentPending && (
+                                        <Box sx={{
+                                            p: 3,
+                                            bgcolor: "#f5f3ff",
+                                            borderRadius: "8px",
+                                            border: "1px solid #c4b5fd",
+                                            textAlign: "center"
+                                        }}>
+                                            <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "16px", color: "#7c3aed" }}>
+                                                You're Enrolled!
+                                            </Typography>
+                                            <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px", color: "var(--greyText)" }}>
+                                                Your course will start soon. Check back for updates.
+                                            </Typography>
+                                        </Box>
+                                    )}
+
+                                    {/* Course Materials */}
+                                    {assignment.deliveryFiles?.length > 0 && (
+                                        <Box sx={{ mt: 2 }}>
+                                            <Typography sx={{ fontFamily: "SemiBold_W", fontSize: "13px", mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                                                <MdCloudDownload /> Course Materials
+                                            </Typography>
+                                            <Stack direction="row" spacing={1} flexWrap="wrap">
+                                                {assignment.deliveryFiles.map((file: any, idx: number) => (
+                                                    <Chip
+                                                        key={idx}
+                                                        label={file.fileName}
+                                                        size="small"
+                                                        icon={<MdDownload />}
+                                                        onClick={() => handleDownload(file.filePath, file.fileName)}
+                                                        sx={{ fontFamily: "Regular_W", fontSize: "11px", cursor: "pointer" }}
+                                                    />
+                                                ))}
+                                            </Stack>
+                                        </Box>
+                                    )}
+                                </Box>
                             </Card>
                         );
                     })}
                 </Box>
             )}
 
-            {/* Course Details Modal */}
-            <Dialog open={detailsModal} onClose={() => setDetailsModal(false)} maxWidth="md" fullWidth>
-                <DialogTitle>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <Typography variant="h6" fontWeight="bold">Course Details</Typography>
-                        <IconButton onClick={() => setDetailsModal(false)} size="small">✕</IconButton>
-                    </Box>
-                </DialogTitle>
-                <DialogContent dividers>
-                    {selectedCourse && (
-                        <Grid container spacing={4}>
-                            {/* Left Column: Info */}
-                            <Grid xs={12} md={7}>
-                                <Typography variant="h5" fontWeight="700" color="primary" gutterBottom>
-                                    {selectedCourse.itemId?.name}
-                                </Typography>
-
-                                {/* Meta Info Grid */}
-                                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mb: 3 }}>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">Trainer</Typography>
-                                        <Typography variant="body2" fontWeight="500">{selectedCourse.itemId?.trainer || "N/A"}</Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">Duration</Typography>
-                                        <Typography variant="body2" fontWeight="500">{selectedCourse.itemId?.duration || "N/A"}</Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">Start Date</Typography>
-                                        <Typography variant="body2" fontWeight="500">
-                                            {selectedCourse.itemId?.startDate ? new Date(selectedCourse.itemId.startDate).toLocaleDateString() : "TBA"}
-                                        </Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">End Date</Typography>
-                                        <Typography variant="body2" fontWeight="500">
-                                            {selectedCourse.itemId?.endDate ? new Date(selectedCourse.itemId.endDate).toLocaleDateString() : "TBA"}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-
-                                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Description</Typography>
-                                <Typography variant="body2" color="text.secondary" paragraph>
-                                    {selectedCourse.itemId?.description}
-                                </Typography>
-
-                                <Divider sx={{ my: 3 }} />
-
-                                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Resources & Files</Typography>
-                                {((selectedCourse.itemId?.attachments?.length || 0) + (selectedCourse.deliveryFiles?.length || 0)) === 0 && (
-                                    <Typography variant="caption" color="text.secondary">No resources available.</Typography>
-                                )}
-
-                                <List dense>
-                                    {/* General Attachments */}
-                                    {selectedCourse.itemId?.attachments?.map((file: any, idx: number) => (
-                                        <ListItem key={`att-${idx}`} secondaryAction={
-                                            <IconButton edge="end" onClick={() => handleDownload(file.filePath, file.fileName)}>
-                                                <MdDownload />
-                                            </IconButton>
-                                        }>
-                                            <ListItemIcon><MdDescription color="#3b82f6" /></ListItemIcon>
-                                            <ListItemText primary={file.fileName} secondary="Course Material" />
-                                        </ListItem>
-                                    ))}
-                                    {/* Student Delivery Files */}
-                                    {selectedCourse.deliveryFiles?.map((file: any, idx: number) => (
-                                        <ListItem key={`del-${idx}`} secondaryAction={
-                                            <IconButton edge="end" onClick={() => handleDownload(file.filePath, file.fileName)}>
-                                                <MdDownload />
-                                            </IconButton>
-                                        }>
-                                            <ListItemIcon><MdDescription color="#10b981" /></ListItemIcon>
-                                            <ListItemText primary={file.fileName} secondary="Your Course File" />
-                                        </ListItem>
-                                    ))}
-                                </List>
-                            </Grid>
-
-                            {/* Right Column: Status & Actions */}
-                            <Grid xs={12} md={5}>
-                                {/* Payment Status */}
-                                <Card variant="outlined" sx={{ mb: 3, borderRadius: 2 }}>
-                                    <CardContent>
-                                        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Payment Status</Typography>
-                                        {selectedCourse.payment?.status === "paid" ? (
-                                            <Box>
-                                                <Alert severity="success" sx={{ py: 0, mb: 1 }}>Paid</Alert>
-                                                <Button
-                                                    startIcon={<MdPayment />}
-                                                    variant="text"
-                                                    size="small"
-                                                    fullWidth
-                                                    disabled={generatingInvoice}
-                                                    onClick={handleDownloadInvoice}
-                                                >
-                                                    {generatingInvoice ? "Generating..." : "Download Invoice"}
-                                                </Button>
-                                            </Box>
-                                        ) : (
-                                            <Box>
-                                                <Alert severity="warning" sx={{ mb: 1 }}>
-                                                    Pending: ₹{selectedCourse.payment?.amount || 0}
-                                                    {selectedCourse.payment?.notes && <Box component="div" sx={{ fontSize: "0.8em", mt: 0.5 }}>{selectedCourse.payment.notes}</Box>}
-                                                </Alert>
-
-                                                {/* Show configured payment instructions */}
-                                                {paymentSettings && (
-                                                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                                                        {paymentSettings.enableBankTransfer && (
-                                                            <Box>
-                                                                <Typography variant="subtitle2" fontWeight="600">Bank Transfer</Typography>
-                                                                <Typography variant="body2">Account Holder: {paymentSettings.bankDetails?.accountHolderName || "-"}</Typography>
-                                                                <Typography variant="body2">Account Number: {paymentSettings.bankDetails?.accountNumber || "-"}</Typography>
-                                                                <Typography variant="body2">Bank: {paymentSettings.bankDetails?.bankName || "-"} | IFSC: {paymentSettings.bankDetails?.ifsc || "-"}</Typography>
-                                                            </Box>
-                                                        )}
-
-                                                        {paymentSettings.enableUPI && (
-                                                            <Box>
-                                                                <Typography variant="subtitle2" fontWeight="600" sx={{ mt: 1 }}>UPI / QR</Typography>
-                                                                <Typography variant="body2">UPI ID: {paymentSettings.upiId || "-"}</Typography>
-                                                                {paymentSettings.qrUrl && <Box component="img" src={paymentSettings.qrUrl} alt="UPI QR" sx={{ width: 120, height: 120, mt: 1 }} />}
-                                                            </Box>
-                                                        )}
-                                                    </Box>
-                                                )}
-                                            </Box>
-                                        )}
-                                    </CardContent>
-                                </Card>
-
-                                {/* Assignments */}
-                                <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                                    <CardContent>
-                                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                                            <Typography variant="subtitle2" fontWeight="bold">Assignments</Typography>
-                                            <Button size="small" startIcon={<MdUpload />} onClick={() => { setDetailsModal(false); setUploadModal(true); }}>
-                                                Upload
-                                            </Button>
-                                        </Box>
-                                        {selectedCourse.courseSubmissions?.length > 0 ? (
-                                            <List dense>
-                                                {selectedCourse.courseSubmissions.map((sub: any, idx: number) => (
-                                                    <ListItem key={idx} sx={{ px: 0 }}>
-                                                        <ListItemIcon sx={{ minWidth: 32 }}><MdAttachFile /></ListItemIcon>
-                                                        <ListItemText
-                                                            primary={sub.fileName}
-                                                            secondary={new Date(sub.uploadedAt).toLocaleDateString()}
-                                                            primaryTypographyProps={{ variant: "body2", noWrap: true }}
-                                                        />
-                                                    </ListItem>
-                                                ))}
-                                            </List>
-                                        ) : (
-                                            <Typography variant="caption" color="text.secondary" align="center" display="block">
-                                                No submissions yet.
-                                            </Typography>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </Grid>
-                        </Grid>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDetailsModal(false)}>Close</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* Upload Modal */}
+            {/* Upload Assignment Modal */}
             <Dialog open={uploadModal} onClose={() => setUploadModal(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Upload Assignment</DialogTitle>
-                <DialogContent>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 1 }}>
+                <DialogTitle sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderBottom: "1px solid var(--borderColor)",
+                    fontFamily: "SemiBold_W",
+                    fontSize: "16px"
+                }}>
+                    Submit Assignment
+                    <IconButton onClick={() => setUploadModal(false)} size="small"><IoClose /></IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <Alert severity="info" sx={{ fontFamily: "Regular_W", fontSize: "13px" }}>
+                            Upload your assignment for <strong>{selectedCourse?.itemId?.name}</strong>
+                        </Alert>
                         <Button
                             variant="outlined"
                             component="label"
                             sx={{
                                 height: 100,
                                 borderStyle: "dashed",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 1
+                                borderColor: "var(--borderColor)",
+                                fontFamily: "Regular_W",
+                                fontSize: "13px"
                             }}
                         >
-                            <MdUpload size={32} />
-                            {uploadFile ? uploadFile.name : "Click to select file"}
+                            <Box sx={{ textAlign: "center" }}>
+                                <MdUpload size={32} />
+                                <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px" }}>
+                                    {uploadFile ? uploadFile.name : "Click to select file"}
+                                </Typography>
+                            </Box>
                             <input type="file" hidden onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
                         </Button>
                         <TextField
@@ -511,107 +527,125 @@ const MyCourses = () => {
                             fullWidth
                             multiline
                             rows={3}
-                            placeholder="Add any comments about your submission..."
+                            sx={{ "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "13px" } }}
                         />
                     </Box>
                 </DialogContent>
-                <DialogActions sx={{ p: 2.5 }}>
-                    <Button onClick={() => setUploadModal(false)} color="inherit">Cancel</Button>
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    <Button onClick={() => setUploadModal(false)} sx={{ fontFamily: "Medium_W", fontSize: "12px" }}>Cancel</Button>
                     <Button
                         variant="contained"
                         onClick={() => uploadMutation.mutate()}
                         disabled={!uploadFile || uploadMutation.isPending}
-                        sx={submitButtonStyle}
+                        sx={{ ...primaryButtonStyle }}
                     >
-                        {uploadMutation.isPending ? "Uploading..." : "Submit Assignment"}
+                        {uploadMutation.isPending ? "Uploading..." : "Submit"}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Hidden Invoice Template */}
-            <Box sx={{ position: "absolute", left: "-3000px", top: 0 }}>
-                <div
-                    ref={invoiceRef}
-                    style={{
-                        width: "210mm",
-                        minHeight: "297mm",
-                        padding: "40px",
-                        backgroundColor: "#fff",
-                        fontFamily: "'Roboto', sans-serif",
-                        color: "#333",
-                        boxSizing: "border-box"
-                    }}
-                >
-                    {/* Header */}
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 4, borderBottom: "2px solid #eee", pb: 2 }}>
-                        <Box>
-                            <img src={logo} alt="Logo" style={{ height: "60px", marginBottom: "10px" }} />
-                            <Typography variant="h6" fontWeight="bold" color="primary">Skill Up Tech Solutions</Typography>
-                            <Typography variant="body2">Plot No. 10, 2nd Floor, Somewhere Street</Typography>
-                            <Typography variant="body2">City, State - Zip Code</Typography>
-                            <Typography variant="body2">Email: contact@skilluptech.com</Typography>
-                        </Box>
-                        <Box sx={{ textAlign: "right" }}>
-                            <Typography variant="h3" fontWeight="bold" color="#ccc" sx={{ letterSpacing: 2 }}>INVOICE</Typography>
-                            <Typography variant="body1" fontWeight="bold" sx={{ mt: 2 }}>Order # {selectedCourse?.payment?.transactionId || Date.now().toString().slice(-6)}</Typography>
-                            <Typography variant="body2">Date: {new Date().toLocaleDateString()}</Typography>
-                        </Box>
-                    </Box>
+            {/* Payment Proof Modal */}
+            <Dialog open={paymentProofModal} onClose={() => setPaymentProofModal(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderBottom: "1px solid var(--borderColor)",
+                    fontFamily: "SemiBold_W",
+                    fontSize: "16px"
+                }}>
+                    Upload Payment Proof
+                    <IconButton onClick={() => setPaymentProofModal(false)} size="small"><IoClose /></IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <Alert severity="info" sx={{ fontFamily: "Regular_W", fontSize: "13px" }}>
+                            Upload screenshot for <strong>{selectedCourse?.itemId?.name}</strong>
+                            <br />Amount: <strong>₹{selectedCourse?.payment?.amount}</strong>
+                        </Alert>
 
-                    {/* Bill To */}
-                    <Box sx={{ mb: 4 }}>
-                        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1, color: "#555" }}>Bill To:</Typography>
-                        <Typography variant="h6" fontWeight="bold">{selectedCourse?.student?.name || "Student Name"}</Typography>
-                        <Typography variant="body2">{selectedCourse?.student?.email || "student@example.com"}</Typography>
-                    </Box>
-
-                    {/* Table */}
-                    <Box sx={{ width: "100%", mb: 4 }}>
-                        <Box sx={{ display: "flex", bgcolor: "#f1f5f9", p: 1.5, borderRadius: 1 }}>
-                            <Typography sx={{ flex: 3, fontWeight: "bold" }}>Description</Typography>
-                            <Typography sx={{ flex: 1, textAlign: "center", fontWeight: "bold" }}>Qty</Typography>
-                            <Typography sx={{ flex: 1, textAlign: "right", fontWeight: "bold" }}>Price</Typography>
-                            <Typography sx={{ flex: 1, textAlign: "right", fontWeight: "bold" }}>Total</Typography>
-                        </Box>
-                        <Box sx={{ display: "flex", p: 1.5, borderBottom: "1px solid #eee" }}>
-                            <Typography sx={{ flex: 3 }}>
-                                Course Fee: <strong>{selectedCourse?.itemId?.name}</strong>
-                                {selectedCourse?.payment?.notes && <span style={{ display: "block", fontSize: "0.8em", color: "#666" }}>{selectedCourse.payment.notes}</span>}
-                            </Typography>
-                            <Typography sx={{ flex: 1, textAlign: "center" }}>1</Typography>
-                            <Typography sx={{ flex: 1, textAlign: "right" }}>₹{selectedCourse?.payment?.amount}</Typography>
-                            <Typography sx={{ flex: 1, textAlign: "right" }}>₹{selectedCourse?.payment?.amount}</Typography>
-                        </Box>
-                    </Box>
-
-                    {/* Total */}
-                    <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 6 }}>
-                        <Box sx={{ width: "250px" }}>
-                            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                                <Typography>Subtotal:</Typography>
-                                <Typography>₹{selectedCourse?.payment?.amount}</Typography>
+                        <Button
+                            variant="outlined"
+                            component="label"
+                            sx={{
+                                height: 100,
+                                borderStyle: "dashed",
+                                borderColor: "var(--borderColor)",
+                                fontFamily: "Regular_W",
+                                fontSize: "13px"
+                            }}
+                        >
+                            <Box sx={{ textAlign: "center" }}>
+                                <MdUpload size={32} />
+                                <Typography sx={{ fontFamily: "Regular_W", fontSize: "13px" }}>
+                                    {paymentProofFile ? paymentProofFile.name : "Click to upload proof"}
+                                </Typography>
                             </Box>
-                            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1, fontWeight: "bold", fontSize: "1.2rem", borderTop: "2px solid #333", pt: 1 }}>
-                                <Typography>Total:</Typography>
-                                <Typography>₹{selectedCourse?.payment?.amount}</Typography>
-                            </Box>
-                        </Box>
-                    </Box>
+                            <input type="file" hidden accept="image/*,.pdf" onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)} />
+                        </Button>
 
-                    {/* Footer */}
-                    <Box sx={{ mt: "auto", pt: 4, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                        <Box>
-                            <Typography variant="h6" fontWeight="bold">Thank you for your business!</Typography>
-                            <Typography variant="caption" color="text.secondary">If you have any questions, please contact support.</Typography>
-                        </Box>
-                        <div style={{ textAlign: "center" }}>
-                            <img src={sign} alt="Sign" style={{ width: "100px" }} />
-                            <Typography variant="body2" fontWeight="bold">Authorized Signature</Typography>
-                        </div>
+                        <TextField
+                            select
+                            label="Payment Method"
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            fullWidth
+                            SelectProps={{ native: true }}
+                            sx={{ "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "13px" } }}
+                        >
+                            <option value="">Select Method</option>
+                            <option value="upi">UPI</option>
+                            <option value="bank-transfer">Bank Transfer</option>
+                            <option value="cash">Cash</option>
+                            <option value="other">Other</option>
+                        </TextField>
+
+                        <TextField
+                            label="Transaction ID (Optional)"
+                            value={transactionId}
+                            onChange={(e) => setTransactionId(e.target.value)}
+                            fullWidth
+                            placeholder="e.g., UPI Ref No"
+                            sx={{ "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "13px" } }}
+                        />
                     </Box>
-                </div>
-            </Box>
-        </Box >
+                </DialogContent>
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    <Button onClick={() => setPaymentProofModal(false)} sx={{ fontFamily: "Medium_W", fontSize: "12px" }}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => {
+                            if (!paymentProofFile || !selectedCourse) return;
+                            const formData = new FormData();
+                            formData.append("proofFile", paymentProofFile);
+                            if (paymentMethod) formData.append("paymentMethod", paymentMethod);
+                            if (transactionId) formData.append("transactionId", transactionId);
+
+                            paymentProofMutation.mutate({
+                                assignmentId: selectedCourse._id,
+                                formData
+                            }, {
+                                onSuccess: () => {
+                                    CustomSnackBar.successSnackbar("Payment proof uploaded!");
+                                    queryClient.invalidateQueries({ queryKey: ["my-courses"] });
+                                    setPaymentProofModal(false);
+                                    setPaymentProofFile(null);
+                                    setPaymentMethod("");
+                                    setTransactionId("");
+                                },
+                                onError: (err: any) => {
+                                    CustomSnackBar.errorSnackbar(err.response?.data?.message || "Failed to upload");
+                                }
+                            });
+                        }}
+                        disabled={!paymentProofFile || paymentProofMutation.isPending}
+                        sx={{ ...dangerButtonStyle }}
+                    >
+                        {paymentProofMutation.isPending ? "Uploading..." : "Submit Proof"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Box>
     );
 };
 

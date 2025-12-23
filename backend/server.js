@@ -38,6 +38,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Security middleware
+const securityHeaders = require('./middleware/securityHeaders');
+const { generalLimiter } = require('./middleware/rateLimit');
+app.use(securityHeaders);
+app.use('/api', generalLimiter);
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({

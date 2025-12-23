@@ -6,8 +6,8 @@ import StudentSignup from "../Auth/StudentSignup";
 import ActivateAccount from "../Auth/ActivateAccount";
 import Layout from "../Components/Layout";
 import StudentLayout from "../Components/StudentLayout";
-import Users from "../Custom/Users";
-import Courses from "../Pages/Courses";
+import PeopleManagement from "../Pages/PeopleManagement";
+import ProgramsManagement from "../Pages/ProgramsManagement";
 import Offers from "../Pages/Offers";
 import Category from "../Pages/Category";
 import Carrers from "../Pages/Carrers";
@@ -40,18 +40,13 @@ import StudentProfile from "../Pages/Student/StudentProfile";
 import SubmitProject from "../Pages/Student/SubmitProject";
 
 import AnnouncementManagement from "../Pages/AnnouncementManagement";
-import SubmissionsManagement from "../Pages/SubmissionsManagement";
-import ProjectSubmissions from "../Pages/ProjectSubmissions";
-import InternshipManagement from "../Pages/InternshipManagement";
-import ProjectManagement from "../Pages/ProjectManagement";
+
 import StudentDetail from "../Pages/StudentDetail";
-import EmployeeManagement from "../Pages/Admin/Payroll/EmployeeManagement";
 import SalarySetup from "../Pages/Admin/Payroll/SalarySetup";
-import GeneratePayslip from "../Pages/Admin/Payroll/GeneratePayslip";
-import PayslipHistory from "../Pages/Admin/Payroll/PayslipHistory";
 import EmployeePortal from "../Pages/Employee/EmployeePortal";
-import PayslipSettings from "../Pages/Admin/Payroll/PayslipSettings";
+import PayrollManagement from "../Pages/Admin/Payroll/PayrollManagement";
 import PaymentSettings from "../Pages/Admin/PaymentSettings";
+import PaymentManagement from "../Pages/Admin/PaymentManagement";
 
 const routes = createHashRouter([
   // Auth Routes
@@ -143,11 +138,11 @@ const routes = createHashRouter([
       },
       {
         path: "users",
-        element: <ProtectedRoute element={<Users />} allowedRoles={["admin"]} />,
+        element: <ProtectedRoute element={<PeopleManagement />} allowedRoles={["admin"]} />,
       },
       {
         path: "courses",
-        element: <ProtectedRoute element={<Courses />} allowedRoles={["admin"]} />,
+        element: <ProtectedRoute element={<ProgramsManagement />} allowedRoles={["admin"]} />,
       },
       {
         path: "offers",
@@ -173,21 +168,15 @@ const routes = createHashRouter([
         path: "announcements",
         element: <ProtectedRoute element={<AnnouncementManagement />} allowedRoles={["admin"]} />,
       },
-      {
-        path: "submissions",
-        element: <ProtectedRoute element={<SubmissionsManagement />} allowedRoles={["admin"]} />,
-      },
-      {
-        path: "project-submissions",
-        element: <ProtectedRoute element={<ProjectSubmissions />} allowedRoles={["admin"]} />,
-      },
+
+
       {
         path: "internships",
-        element: <ProtectedRoute element={<InternshipManagement />} allowedRoles={["admin"]} />,
+        element: <ProtectedRoute element={<ProgramsManagement />} allowedRoles={["admin"]} />,
       },
       {
         path: "projects",
-        element: <ProtectedRoute element={<ProjectManagement />} allowedRoles={["admin"]} />,
+        element: <ProtectedRoute element={<ProgramsManagement />} allowedRoles={["admin"]} />,
       },
       {
         path: "student/:id",
@@ -196,7 +185,7 @@ const routes = createHashRouter([
       // Payroll Routes
       {
         path: "employees",
-        element: <ProtectedRoute element={<EmployeeManagement />} allowedRoles={["admin"]} />,
+        element: <ProtectedRoute element={<PeopleManagement />} allowedRoles={["admin"]} />,
       },
       {
         path: "payroll/salary/:id",
@@ -204,19 +193,23 @@ const routes = createHashRouter([
       },
       {
         path: "payroll/generate",
-        element: <ProtectedRoute element={<GeneratePayslip />} allowedRoles={["admin"]} />,
+        element: <ProtectedRoute element={<PayrollManagement />} allowedRoles={["admin"]} />,
       },
       {
         path: "payroll/history",
-        element: <ProtectedRoute element={<PayslipHistory />} allowedRoles={["admin"]} />,
+        element: <ProtectedRoute element={<PayrollManagement />} allowedRoles={["admin"]} />,
       },
       {
         path: "payroll/settings",
-        element: <ProtectedRoute element={<PayslipSettings />} allowedRoles={["admin"]} />,
+        element: <ProtectedRoute element={<PayrollManagement />} allowedRoles={["admin"]} />,
       },
       {
         path: "payment/settings",
         element: <ProtectedRoute element={<PaymentSettings />} allowedRoles={["admin"]} />,
+      },
+      {
+        path: "payment-management",
+        element: <ProtectedRoute element={<PaymentManagement />} allowedRoles={["admin"]} />,
       },
     ],
   },

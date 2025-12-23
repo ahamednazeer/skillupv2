@@ -251,7 +251,7 @@ const serviceDetails: Record<
         textColor: "white",
       },
       {
-        icon: "👥",
+        icon: "",
         title: "Beginner Friendly",
         desc: "Workshops designed for all skill levels, from beginners to advanced learners",
         gradient: "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
