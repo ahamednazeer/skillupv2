@@ -104,4 +104,7 @@ ProjectSchema.pre('save', function (next) {
     next();
 });
 
+// Indexes
+ProjectSchema.index({ status: 1 });
+
 module.exports = mongoose.model("Project", ProjectSchema);

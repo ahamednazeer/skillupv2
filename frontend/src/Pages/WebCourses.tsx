@@ -221,8 +221,16 @@ const WebCourses = () => {
                 <CardMedia
                   component="img"
                   height="200"
-                  image={`${config.BASE_URL_MAIN}/uploads/${course.fileupload}`}
+                  image={course.fileupload
+                    ? `${config.BASE_URL_MAIN}/uploads/${course.fileupload}`
+                    : 'https://placehold.co/400x200/f5f5f5/999999?text=No+Image'
+                  }
                   alt={course.name}
+                  sx={{
+                    objectFit: 'contain',
+                    objectPosition: 'center',
+                    backgroundColor: '#f8f8f8',
+                  }}
                 />
 
                 {/* Course Content */}

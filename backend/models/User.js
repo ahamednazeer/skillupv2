@@ -30,5 +30,10 @@ userSchema.pre('save', function (next) {
   next();
 });
 
+// Indexes
+userSchema.index({ role: 1 });
+userSchema.index({ status: 1 });
+userSchema.index({ inviteToken: 1 });
+
 module.exports = mongoose.model("User", userSchema);
 

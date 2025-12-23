@@ -1,19 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
+import api from "../Interceptors/Interceptor";
 import Cookies from "js-cookie";
 
-const BASE_URL = import.meta.env.VITE_APP_BASE_URL;
-
-const getAuthHeader = () => {
-    const token = Cookies.get("skToken");
-    return { headers: { Authorization: `Bearer ${token}` } };
-};
+// Using the api interceptor which handles token refresh automatically
 
 export const useGetPaymentSettings = () => {
     return useQuery({
         queryKey: ["paymentSettings"],
         queryFn: async () => {
-            const response = await axios.get(`${BASE_URL}payment/settings`);
+            const response = await api.get("payment/settings");
             return response.data;
         },
     });
@@ -23,7 +18,7 @@ export const useGetPaymentSettingsAdmin = () => {
     return useQuery({
         queryKey: ["adminPaymentSettings"],
         queryFn: async () => {
-            const response = await axios.get(`${BASE_URL}admin/payment/settings`, getAuthHeader());
+            const response = await api.get("admin/payment/settings");
             return response.data;
         },
     });
@@ -33,7 +28,7 @@ export const useUpdatePaymentSettings = () => {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: async (data: any) => {
-            const response = await axios.put(`${BASE_URL}admin/payment/settings`, data, getAuthHeader());
+            const response = await api.put("admin/payment/settings", data);
             return response.data;
         },
         onSuccess: () => qc.invalidateQueries({ queryKey: ["adminPaymentSettings"] }),
@@ -44,11 +39,14 @@ export const useUploadPaymentQR = () => {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: async (formData: FormData) => {
-            const response = await axios.post(`${BASE_URL}admin/payment/settings/upload-qr`, formData, { headers: { Authorization: `Bearer ${Cookies.get("skToken")}`, "Content-Type": "multipart/form-data" } });
+            // For file uploads, we need to manually set Content-Type
+            const response = await api.post("admin/payment/settings/upload-qr", formData, {
+                headers: { "Content-Type": "multipart/form-data" }
+            });
             return response.data;
         },
         onSuccess: () => qc.invalidateQueries({ queryKey: ["adminPaymentSettings"] })
-    })
+    });
 };
 
 // ===== Payment Management Hooks =====
@@ -61,7 +59,7 @@ export const useGetPendingPayments = (filters?: { status?: string; itemType?: st
             const params = new URLSearchParams();
             if (filters?.status) params.append("status", filters.status);
             if (filters?.itemType) params.append("itemType", filters.itemType);
-            const response = await axios.get(`${BASE_URL}admin/pending-payments?${params.toString()}`, getAuthHeader());
+            const response = await api.get(`admin/pending-payments?${params.toString()}`);
             return response.data;
         },
     });
@@ -72,7 +70,7 @@ export const useMarkPaymentPaid = () => {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: async ({ assignmentId, transactionId, notes }: { assignmentId: string; transactionId?: string; notes?: string }) => {
-            const response = await axios.put(`${BASE_URL}admin/assignments/${assignmentId}/mark-paid`, { transactionId, notes }, getAuthHeader());
+            const response = await api.put(`admin/assignments/${assignmentId}/mark-paid`, { transactionId, notes });
             return response.data;
         },
         onSuccess: () => {
@@ -91,10 +89,10 @@ export const useUploadPaymentProof = () => {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: async ({ assignmentId, formData }: { assignmentId: string; formData: FormData }) => {
-            const response = await axios.post(
-                `${BASE_URL}student/assignments/${assignmentId}/upload-payment-proof`,
+            const response = await api.post(
+                `student/assignments/${assignmentId}/upload-payment-proof`,
                 formData,
-                { headers: { Authorization: `Bearer ${Cookies.get("skToken")}`, "Content-Type": "multipart/form-data" } }
+                { headers: { "Content-Type": "multipart/form-data" } }
             );
             return response.data;
         },
@@ -111,11 +109,7 @@ export const useGenerateInvoice = () => {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: async (assignmentId: string) => {
-            const response = await axios.post(
-                `${BASE_URL}admin/assignments/${assignmentId}/generate-invoice`,
-                {},
-                getAuthHeader()
-            );
+            const response = await api.post(`admin/assignments/${assignmentId}/generate-invoice`, {});
             return response.data;
         },
         onSuccess: () => {

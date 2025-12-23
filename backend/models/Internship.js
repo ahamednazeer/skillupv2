@@ -112,4 +112,7 @@ InternshipSchema.pre('save', function (next) {
     next();
 });
 
+// Indexes
+InternshipSchema.index({ status: 1 });
+
 module.exports = mongoose.model("Internship", InternshipSchema);

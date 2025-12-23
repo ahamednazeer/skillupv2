@@ -15,13 +15,11 @@ import {
 } from "@mui/material";
 import { MdAdd, MdEdit, MdDelete } from "react-icons/md";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
-import Cookies from "js-cookie";
+import api from "../Interceptors/Interceptor";
 import CustomSnackBar from "../Custom/CustomSnackBar";
 import { primaryButtonStyle, cancelButtonStyle, submitButtonStyle } from "../assets/Styles/ButtonStyles";
 
 const AnnouncementManagement = () => {
-    const token = Cookies.get("skToken");
     const queryClient = useQueryClient();
     const [modalOpen, setModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
@@ -35,21 +33,14 @@ const AnnouncementManagement = () => {
     const { data, isLoading } = useQuery({
         queryKey: ["announcements"],
         queryFn: async () => {
-            const response = await axios.get(
-                `${import.meta.env.VITE_APP_BASE_URL}admin/announcements`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const response = await api.get("admin/announcements");
             return response.data;
         },
     });
 
     const createMutation = useMutation({
         mutationFn: async (data: any) => {
-            const response = await axios.post(
-                `${import.meta.env.VITE_APP_BASE_URL}admin/announcements`,
-                data,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const response = await api.post("admin/announcements", data);
             return response.data;
         },
         onSuccess: () => {
@@ -64,11 +55,7 @@ const AnnouncementManagement = () => {
 
     const updateMutation = useMutation({
         mutationFn: async ({ id, data }: { id: string; data: any }) => {
-            const response = await axios.put(
-                `${import.meta.env.VITE_APP_BASE_URL}admin/announcements/${id}`,
-                data,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const response = await api.put(`admin/announcements/${id}`, data);
             return response.data;
         },
         onSuccess: () => {
@@ -83,10 +70,7 @@ const AnnouncementManagement = () => {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const response = await axios.delete(
-                `${import.meta.env.VITE_APP_BASE_URL}admin/announcements/${id}`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const response = await api.delete(`admin/announcements/${id}`);
             return response.data;
         },
         onSuccess: () => {
@@ -100,11 +84,7 @@ const AnnouncementManagement = () => {
 
     const toggleStatusMutation = useMutation({
         mutationFn: async (id: string) => {
-            const response = await axios.post(
-                `${import.meta.env.VITE_APP_BASE_URL}admin/announcements/${id}/toggle-status`,
-                {},
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const response = await api.post(`admin/announcements/${id}/toggle-status`, {});
             return response.data;
         },
         onSuccess: () => {

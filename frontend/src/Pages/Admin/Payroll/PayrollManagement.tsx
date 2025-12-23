@@ -35,7 +35,7 @@ const PayrollManagement = () => {
         <Box sx={{ p: 3 }}>
             {/* Header */}
             <Typography variant="h5" fontWeight="bold" sx={{ mb: 3 }}>
-                💰 Payroll Management
+                Payroll Management
             </Typography>
 
             {/* Main Tabs */}

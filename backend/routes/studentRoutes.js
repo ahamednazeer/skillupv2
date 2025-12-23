@@ -2,268 +2,51 @@ const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/auth");
 const { studentOnly } = require("../middleware/roleAuth");
-const User = require("../models/User");
-const bcrypt = require("bcryptjs");
-const StudentAssignment = require("../models/StudentAssignment");
-const Announcement = require("../models/Announcement");
 const submissionController = require("../controllers/submissionController");
 const upload = require("../config/multer");
+
+// Import new controllers
+const studentAuthController = require("../controllers/studentAuthController");
+const studentProfileController = require("../controllers/studentProfileController");
 
 // ===== Public Routes (No Auth Required) =====
 
 // Student Self Signup
-router.post("/signup", async (req, res) => {
-    const { name, email, mobile, password } = req.body;
-
-    if (!name || !email || !mobile || !password) {
-        return res.status(400).json({ message: "Please fill in all fields" });
-    }
-
-    if (name.length < 3) {
-        return res.status(400).json({ message: "Name must be at least 3 characters long" });
-    }
-
-    if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(email)) {
-        return res.status(400).json({ message: "Invalid Email Address" });
-    }
-
-    if (!/^\d{10}$/.test(mobile)) {
-        return res.status(400).json({ message: "Mobile number must be exactly 10 digits" });
-    }
-
-    if (password.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
-    }
-
-    try {
-        const userExist = await User.findOne({ email });
-        if (userExist) {
-            return res.status(400).json({ message: "User with this email already exists" });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const student = await User.create({
-            name,
-            email,
-            mobile,
-            password: hashedPassword,
-            role: "student",
-            status: "Self-Signed"
-        });
-
-        res.status(201).json({
-            message: "Registration successful. You can now login.",
-            student: {
-                _id: student._id,
-                name: student.name,
-                email: student.email,
-                role: student.role,
-                status: student.status
-            }
-        });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.post("/signup", studentAuthController.signup);
 
 // Activate Account (from invite link)
-router.post("/activate", async (req, res) => {
-    const { token, password } = req.body;
-
-    if (!token || !password) {
-        return res.status(400).json({ message: "Token and password are required" });
-    }
-
-    if (password.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
-    }
-
-    try {
-        const user = await User.findOne({
-            inviteToken: token,
-            inviteTokenExpires: { $gt: Date.now() }
-        });
-
-        if (!user) {
-            return res.status(400).json({ message: "Invalid or expired activation link" });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        await User.findByIdAndUpdate(user._id, {
-            password: hashedPassword,
-            status: "Active",
-            inviteToken: undefined,
-            inviteTokenExpires: undefined,
-            updatedAt: Date.now()
-        });
-
-        res.status(200).json({ message: "Account activated successfully. You can now login." });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.post("/activate", studentAuthController.activate);
 
 // Validate activation token
-router.get("/validate-token/:token", async (req, res) => {
-    try {
-        const user = await User.findOne({
-            inviteToken: req.params.token,
-            inviteTokenExpires: { $gt: Date.now() }
-        }).select("name email");
-
-        if (!user) {
-            return res.status(400).json({ valid: false, message: "Invalid or expired activation link" });
-        }
-
-        res.status(200).json({ valid: true, user: { name: user.name, email: user.email } });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.get("/validate-token/:token", studentAuthController.validateToken);
 
 // ===== Protected Student Routes =====
 router.use(auth);
 router.use(studentOnly);
 
 // Get my profile
-router.get("/me", async (req, res) => {
-    try {
-        const user = await User.findById(req.user.id)
-            .select("-password -inviteToken -inviteTokenExpires");
-
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        res.status(200).json(user);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.get("/me", studentProfileController.getMe);
 
 // Update my profile
-router.put("/me", async (req, res) => {
-    const { name, mobile } = req.body;
-
-    try {
-        const updated = await User.findByIdAndUpdate(
-            req.user.id,
-            { name, mobile, updatedAt: Date.now() },
-            { new: true }
-        ).select("-password -inviteToken -inviteTokenExpires");
-
-        res.status(200).json({ message: "Profile updated", user: updated });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.put("/me", studentProfileController.updateMe);
 
 // Get my courses
-router.get("/my-courses", async (req, res) => {
-    try {
-        const assignments = await StudentAssignment.find({
-            student: req.user.id,
-            itemType: "course"
-        }).populate("itemId").sort({ assignedAt: -1 });
-
-        res.status(200).json(assignments);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.get("/my-courses", studentProfileController.getMyCourses);
 
 // Get my internships
-router.get("/my-internships", async (req, res) => {
-    try {
-        const assignments = await StudentAssignment.find({
-            student: req.user.id,
-            itemType: "internship"
-        }).populate("itemId").sort({ assignedAt: -1 });
-
-        res.status(200).json(assignments);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.get("/my-internships", studentProfileController.getMyInternships);
 
 // Get my projects
-router.get("/my-projects", async (req, res) => {
-    try {
-        const assignments = await StudentAssignment.find({
-            student: req.user.id,
-            itemType: "project"
-        }).populate("itemId").populate("submission").sort({ assignedAt: -1 });
-
-        res.status(200).json(assignments);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.get("/my-projects", studentProfileController.getMyProjects);
 
 // Get all my assignments
-router.get("/my-assignments", async (req, res) => {
-    try {
-        const assignments = await StudentAssignment.find({ student: req.user.id })
-            .populate("itemId")
-            .populate("submission")
-            .sort({ assignedAt: -1 });
-
-        const grouped = {
-            courses: assignments.filter(a => a.itemType === "course"),
-            internships: assignments.filter(a => a.itemType === "internship"),
-            projects: assignments.filter(a => a.itemType === "project")
-        };
-
-        res.status(200).json({ assignments, grouped });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.get("/my-assignments", studentProfileController.getMyAssignments);
 
 // Get dashboard stats
-router.get("/dashboard", async (req, res) => {
-    try {
-        const assignments = await StudentAssignment.find({ student: req.user.id });
-
-        const stats = {
-            totalCourses: assignments.filter(a => a.itemType === "course").length,
-            totalInternships: assignments.filter(a => a.itemType === "internship").length,
-            totalProjects: assignments.filter(a => a.itemType === "project").length,
-            completed: assignments.filter(a => a.status === "completed").length,
-            inProgress: assignments.filter(a => a.status === "in-progress").length,
-            assigned: assignments.filter(a => a.status === "assigned").length
-        };
-
-        const announcements = await Announcement.find({
-            isActive: true,
-            targetAudience: { $in: ["all", "students"] }
-        })
-            .sort({ createdAt: -1 })
-            .limit(5);
-
-        res.status(200).json({ stats, recentAnnouncements: announcements });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.get("/dashboard", studentProfileController.getDashboard);
 
 // Get announcements
-router.get("/announcements", async (req, res) => {
-    try {
-        const announcements = await Announcement.find({
-            isActive: true,
-            targetAudience: { $in: ["all", "students"] }
-        })
-            .populate("createdBy", "name")
-            .sort({ priority: -1, createdAt: -1 });
-
-        res.status(200).json(announcements);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.get("/announcements", studentProfileController.getAnnouncements);
 
 // Submission routes
 router.post("/submissions", submissionController.createSubmission);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+
 import {
     Box,
     Grid,
@@ -115,7 +115,7 @@ const StudentDashboard = () => {
                     {/* Stats Cards */}
                     <Grid container spacing={2} sx={{ mb: 4 }}>
                         {cards.map((card, idx) => (
-                            <Grid item xs={6} sm={4} md={2} key={idx}>
+                            <Grid size={{ xs: 6, sm: 4, md: 2 }} key={idx}>
                                 <Paper
                                     elevation={0}
                                     sx={{

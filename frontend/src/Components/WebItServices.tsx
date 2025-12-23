@@ -1,476 +1,557 @@
-import { Box, Typography, Stack, Grid, Card, CardContent } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  IconButton,
+} from "@mui/material";
+import NorthEastIcon from "@mui/icons-material/NorthEast";
+import CodeIcon from "@mui/icons-material/Code";
+import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
+import CloudIcon from "@mui/icons-material/Cloud";
+import SecurityIcon from "@mui/icons-material/Security";
+import PsychologyIcon from "@mui/icons-material/Psychology";
+import BarChartIcon from "@mui/icons-material/BarChart";
+import SettingsIcon from "@mui/icons-material/Settings";
+import BrushIcon from "@mui/icons-material/Brush";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
+import RouterIcon from "@mui/icons-material/Router";
+import BugReportIcon from "@mui/icons-material/BugReport";
+import CampaignIcon from "@mui/icons-material/Campaign";
+import SupportAgentIcon from "@mui/icons-material/SupportAgent";
+import { useLocation, useNavigate } from "react-router-dom";
+
+const itServices = [
+  {
+    number: "01",
+    icon: CodeIcon,
+    title: "Web Development",
+    desc: "Custom website development using React, Angular, Vue.js, and modern technologies. We build responsive, scalable, and SEO-friendly web applications tailored to your business needs.",
+  },
+  {
+    number: "02",
+    icon: PhoneAndroidIcon,
+    title: "Mobile App Development",
+    desc: "Native and cross-platform mobile app development for iOS and Android using React Native, Flutter, and Swift/Kotlin. We deliver apps with seamless UX and robust performance.",
+  },
+  {
+    number: "03",
+    icon: CloudIcon,
+    title: "Cloud Solutions",
+    desc: "AWS, Azure, and Google Cloud services including migration, deployment, serverless architecture, and cloud infrastructure management for scalable applications.",
+  },
+  {
+    number: "04",
+    icon: SecurityIcon,
+    title: "Cybersecurity",
+    desc: "Comprehensive security solutions including vulnerability assessment, penetration testing, security audits, and compliance management to protect your digital assets.",
+  },
+  {
+    number: "05",
+    icon: PsychologyIcon,
+    title: "AI & Machine Learning",
+    desc: "Intelligent solutions powered by AI, ML, deep learning, NLP, and computer vision for automation and data-driven decision making that transforms your business.",
+  },
+  {
+    number: "06",
+    icon: BarChartIcon,
+    title: "Data Analytics & BI",
+    desc: "Transform raw data into actionable insights with business intelligence, data visualization, and advanced analytics solutions for smarter decision-making.",
+  },
+  {
+    number: "07",
+    icon: SettingsIcon,
+    title: "DevOps & Automation",
+    desc: "Streamline development with CI/CD pipelines, containerization (Docker/Kubernetes), infrastructure as code, and automated deployments for faster delivery.",
+  },
+  {
+    number: "08",
+    icon: BrushIcon,
+    title: "UI/UX Design",
+    desc: "User-centered design services including wireframing, prototyping, user research, and creating intuitive digital experiences that users love.",
+  },
+  {
+    number: "09",
+    icon: AccountTreeIcon,
+    title: "ERP Solutions",
+    desc: "Custom ERP development and implementation to streamline business processes, inventory, HR, and financial management in one integrated platform.",
+  },
+  {
+    number: "10",
+    icon: RouterIcon,
+    title: "Network Infrastructure",
+    desc: "Complete networking solutions including setup, configuration, monitoring, and maintenance of LAN/WAN infrastructure for optimal connectivity.",
+  },
+  {
+    number: "11",
+    icon: BugReportIcon,
+    title: "Software Testing & QA",
+    desc: "Manual and automated testing services including functional, performance, security, and compatibility testing to ensure software quality.",
+  },
+  {
+    number: "12",
+    icon: CampaignIcon,
+    title: "Digital Marketing",
+    desc: "SEO, SEM, social media marketing, content strategy, and analytics to boost your online presence and drive business growth.",
+  },
+  {
+    number: "13",
+    icon: SupportAgentIcon,
+    title: "IT Consulting",
+    desc: "Strategic IT consulting to help businesses optimize technology investments, digital transformation, and IT governance for competitive advantage.",
+  },
+];
+
+const whyChooseUs = [
+  {
+    icon: "⚡",
+    title: "On-Time Delivery",
+    desc: "We respect deadlines and deliver projects on schedule without compromising quality.",
+  },
+  {
+    icon: "👨‍💻",
+    title: "Expert Team",
+    desc: "Our skilled professionals bring years of experience and cutting-edge expertise.",
+  },
+  {
+    icon: "🛠️",
+    title: "24/7 Support",
+    desc: "Round-the-clock technical support to ensure your business runs smoothly.",
+  },
+  {
+    icon: "💰",
+    title: "Cost-Effective",
+    desc: "Premium quality services at competitive prices that fit your budget.",
+  },
+  {
+    icon: "🚀",
+    title: "Latest Technology",
+    desc: "We use cutting-edge tools and frameworks to build future-ready solutions.",
+  },
+  {
+    icon: "📈",
+    title: "Scalable Solutions",
+    desc: "Our solutions grow with your business, adapting to your evolving needs.",
+  },
+];
 
 const WebItServices = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const selectedService = location.state;
+
+  const handleServiceClick = (title: string) => {
+    navigate("/itservices/detail", { state: title });
+  };
+
   return (
     <Box>
-      {/* Gradient Heading */}
-      <Box
-        sx={{
-          fontSize: "130px",
-          fontFamily: "Bold_W",
-          paddingTop: "40px",
-          textTransform: "uppercase",
-          background: "linear-gradient(-1deg, #fff, var(--webprimary))",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-          opacity: 0.8,
-          "@media (max-width: 991px)": { fontSize: "100px" },
-          "@media (max-width: 768px)": { fontSize: "80px" },
-          "@media (max-width: 650px)": { fontSize: "60px" },
-          "@media (max-width: 500px)": { fontSize: "50px" },
-          "@media (max-width: 450px)": { fontSize: "40px" },
-        }}
-      >
-        IT Services
-      </Box>
-
-      {/* Introduction */}
-      <Typography
-        sx={{
-          fontSize: "16px",
-          fontFamily: "Regular_W",
-          color: "#444",
-          maxWidth: "800px",
-          mb: 4,
-        }}
-      >
-        We provide professional IT services that empower businesses and students
-        to build, grow, and compete in the digital world. From interactive
-        websites to mobile apps and performance-focused marketing campaigns — we
-        deliver tailored solutions to meet your specific goals.
-      </Typography>
-
-      <Stack spacing={4}>
-        {/* Web Development */}
-        <Box>
-          <Typography
-            sx={{ fontSize: "20px", fontFamily: "SemiBold_W", mb: 1 }}
-          >
-            1. Web Development
-          </Typography>
-          <Typography
-            sx={{ fontSize: "15px", fontFamily: "Regular_W", color: "#555" }}
-          >
-            We build modern, responsive, and SEO-friendly websites using the
-            latest technologies and best design practices. Our solutions range
-            from simple static landing pages to dynamic portals and fully
-            functional web applications. We prioritize clean design, optimal
-            performance, and strong user experiences. Whether you're a startup,
-            a student, or an established business, we tailor web development to
-            your goals. Each site we build is tested for cross-browser
-            compatibility and mobile responsiveness. We also integrate CMS
-            platforms or custom admin panels when needed. Security, speed, and
-            scalability remain central to every project we deliver.
-          </Typography>
-        </Box>
-
-        {/* Mobile App Development */}
-        <Box>
-          <Typography
-            sx={{ fontSize: "20px", fontFamily: "SemiBold_W", mb: 1 }}
-          >
-            2. Mobile App Development
-          </Typography>
-          <Typography
-            sx={{ fontSize: "15px", fontFamily: "Regular_W", color: "#555" }}
-          >
-            We develop intuitive and robust mobile applications for Android and
-            iOS platforms using both native and cross-platform tools. Whether
-            you need an app for education, business, or productivity, we focus
-            on user experience, speed, and seamless functionality. From
-            wireframing to deployment on the Play Store or App Store, our
-            process is collaborative and transparent. We help transform your
-            ideas into apps that deliver real value and engagement. Our mobile
-            apps include features like push notifications, offline access,
-            integrations with APIs, and scalable backend support. We also
-            provide post-launch support and updates to keep your app current.
-          </Typography>
-        </Box>
-
-        {/* Digital Marketing */}
-        <Box>
-          <Typography
-            sx={{ fontSize: "20px", fontFamily: "SemiBold_W", mb: 1 }}
-          >
-            3. Digital Marketing
-          </Typography>
-          <Typography
-            sx={{ fontSize: "15px", fontFamily: "Regular_W", color: "#555" }}
-          >
-            Our digital marketing services help businesses and individuals grow
-            their presence and reach online. We craft result-driven strategies
-            in SEO, Google Ads, social media campaigns, email marketing, and
-            content creation. Every campaign is tailored to your brand's voice
-            and targeted toward your specific audience. Our goal is to drive
-            traffic, boost engagement, and convert leads into customers. Using
-            tools like analytics and A/B testing, we continuously refine
-            performance. Whether you're launching a new product or increasing
-            brand visibility, we ensure consistent and measurable growth.
-            Transparency and ROI are the backbone of every campaign we run.
-          </Typography>
-        </Box>
-      </Stack>
-
-      {/* Why Choose Us - Advantages Section */}
-      <Box sx={{ mt: 6 }}>
+      {/* Header Section */}
+      <Box sx={{ mb: 4 }}>
         <Typography
-          variant="h5"
-          component="h2"
+          variant="h4"
+          fontWeight="bold"
           gutterBottom
           sx={{
             fontFamily: "SemiBold_W",
-            fontSize: "24px",
-            mb: 3,
-            "@media (max-width: 768px)": {
-              fontSize: "22px",
-              "@media (max-width: 690px)": { fontSize: "20px" },
+            fontSize: "28px",
+            "@media (max-width: 768px)": { fontSize: "24px" },
+            "@media (max-width: 690px)": { fontSize: "22px" },
+          }}
+        >
+          IT Services
+        </Typography>
+        <Typography
+          sx={{
+            fontFamily: "Regular_W",
+            fontSize: "14px",
+            color: "#666",
+            maxWidth: "600px",
+          }}
+        >
+          We provide professional IT services that empower businesses and students
+          to build, grow, and compete in the digital world. From interactive
+          websites to mobile apps and performance-focused solutions.
+        </Typography>
+      </Box>
+
+      {/* IT Services Grid */}
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 3,
+          justifyContent: "space-between",
+          mb: 6,
+        }}
+      >
+        {itServices.map((item, index) => {
+          const IconComponent = item.icon;
+          const isSelected = selectedService === item.title;
+
+          return (
+            <Box
+              flexBasis={"30%"}
+              key={index}
+              sx={{
+                "@media (max-width: 991px)": { flexBasis: "48%" },
+                "@media (max-width: 690px)": { flexBasis: "100%" },
+              }}
+            >
+              <Card
+                elevation={0}
+                onClick={() => handleServiceClick(item.title)}
+                sx={{
+                  borderRadius: "10px",
+                  border: isSelected ? "2px solid var(--webprimary)" : "1px solid #e0e0e0",
+                  height: "100%",
+                  transition: "all 0.3s ease",
+                  cursor: "pointer",
+                  backgroundColor: isSelected ? "var(--weblight)" : "#fff",
+                  "&:hover": {
+                    borderColor: "var(--webprimary)",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+                    "& .service-icon-bg": {
+                      transform: "scale(1.1)",
+                    },
+                    "& .service-arrow": {
+                      backgroundColor: "var(--webprimary)",
+                      borderColor: "var(--webprimary)",
+                      "& svg": {
+                        color: "#fff",
+                      },
+                    },
+                  },
+                }}
+              >
+                <CardContent>
+                  {/* Icon and Number Row */}
+                  <Box
+                    display="flex"
+                    justifyContent="space-between"
+                    alignItems="flex-start"
+                    mb={2}
+                  >
+                    {/* Icon */}
+                    <Box
+                      className="service-icon-bg"
+                      sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: "10px",
+                        backgroundColor: "var(--weblight)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "transform 0.3s ease",
+                      }}
+                    >
+                      <IconComponent
+                        sx={{
+                          fontSize: 24,
+                          color: "var(--webprimary)",
+                        }}
+                      />
+                    </Box>
+                    {/* Number */}
+                    <Typography
+                      sx={{
+                        fontFamily: "SemiBold_W",
+                        fontSize: "20px",
+                        color: "var(--webprimary)",
+                        opacity: 0.6,
+                      }}
+                    >
+                      {item.number}
+                    </Typography>
+                  </Box>
+
+                  {/* Title */}
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontFamily: "Bold_W",
+                      fontSize: "18px",
+                      lineHeight: "1.4",
+                      mb: 1,
+                      "@media (max-width: 768px)": { fontSize: "16px" },
+                    }}
+                  >
+                    {item.title}
+                  </Typography>
+
+                  {/* Description */}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      fontFamily: "Regular_W",
+                      fontSize: "14px",
+                      lineHeight: 1.6,
+                      "@media (max-width: 768px)": { fontSize: "13px" },
+                    }}
+                  >
+                    {item.desc}
+                  </Typography>
+
+                  {/* Arrow Button */}
+                  <Box mt={2}>
+                    <IconButton
+                      className="service-arrow"
+                      sx={{
+                        border: "1px solid #eee",
+                        width: 36,
+                        height: 36,
+                        transition: "all 0.3s ease",
+                      }}
+                    >
+                      <NorthEastIcon
+                        fontSize="small"
+                        sx={{ color: "var(--webprimary)" }}
+                      />
+                    </IconButton>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Box>
+          );
+        })}
+      </Box>
+
+      {/* Why Choose Us Section */}
+      <Box sx={{ mb: 4 }}>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          mb={3}
+          sx={{
+            "@media (max-width: 690px)": {
+              flexDirection: "column",
+              alignItems: "start",
+              gap: 2,
             },
           }}
         >
-          Why Choose Us
-        </Typography>
+          <Box>
+            <Typography
+              variant="h4"
+              fontWeight="bold"
+              gutterBottom
+              sx={{
+                fontFamily: "SemiBold_W",
+                fontSize: "24px",
+                "@media (max-width: 768px)": { fontSize: "22px" },
+                "@media (max-width: 690px)": { fontSize: "20px" },
+              }}
+            >
+              Why Choose Us
+            </Typography>
+            <Typography
+              sx={{
+                fontFamily: "Regular_W",
+                fontSize: "14px",
+                color: "#666",
+              }}
+            >
+              Trusted by businesses and students for delivering exceptional IT solutions
+            </Typography>
+          </Box>
+        </Box>
 
+        {/* Why Choose Us Grid */}
         <Box
           sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              sm: "repeat(2, 1fr)",
-              lg: "repeat(3, 1fr)",
-            },
+            display: "flex",
+            flexWrap: "wrap",
             gap: 3,
-            mb: 4,
+            justifyContent: "space-between",
           }}
         >
-          {/* Advantage 1: On-Time Delivery */}
-          <Card
-            sx={{
-              p: 3,
-              height: "100%",
-              boxShadow: 3,
-              borderRadius: "12px",
-              transition: "all 0.3s ease",
-              "&:hover": {
-                transform: "translateY(-4px)",
-                boxShadow: 6,
-              },
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-              color: "white",
-            }}
-          >
-            <Box display="flex" alignItems="center" gap={2} mb={2}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: "12px",
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "24px",
-                }}
-              >
-                ⏰
-              </Box>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontFamily: "SemiBold_W",
-                  fontSize: "18px",
-                }}
-              >
-                On-Time Delivery
-              </Typography>
-            </Box>
-            <Typography
-              variant="body2"
+          {whyChooseUs.map((item, index) => (
+            <Box
+              flexBasis={"30%"}
+              key={index}
               sx={{
-                fontFamily: "Regular_W",
-                fontSize: "14px",
-                opacity: 0.9,
-                lineHeight: 1.6,
+                "@media (max-width: 991px)": { flexBasis: "48%" },
+                "@media (max-width: 690px)": { flexBasis: "100%" },
               }}
             >
-              We respect deadlines and deliver projects on schedule without
-              compromising quality.
-            </Typography>
-          </Card>
+              <Card
+                elevation={0}
+                sx={{
+                  borderRadius: "10px",
+                  border: "1px solid #e0e0e0",
+                  height: "100%",
+                  transition: "all 0.3s ease",
+                  "&:hover": {
+                    borderColor: "var(--webprimary)",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+                  },
+                }}
+              >
+                <CardContent>
+                  {/* Icon */}
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: "10px",
+                      backgroundColor: "var(--weblight)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "24px",
+                      mb: 2,
+                    }}
+                  >
+                    {item.icon}
+                  </Box>
 
-          {/* Advantage 2: Expert Team */}
-          <Card
+                  {/* Title */}
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontFamily: "Bold_W",
+                      fontSize: "16px",
+                      lineHeight: "1.4",
+                      mb: 1,
+                    }}
+                  >
+                    {item.title}
+                  </Typography>
+
+                  {/* Description */}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      fontFamily: "Regular_W",
+                      fontSize: "14px",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {item.desc}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+
+      {/* Stats Section */}
+      <Box
+        sx={{
+          backgroundColor: "var(--weblight)",
+          borderRadius: "8px",
+          px: 4,
+          py: 3,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 2,
+          boxShadow: "0 1px 4px rgba(0, 0, 0, 0.05)",
+          mb: 4,
+        }}
+      >
+        {[
+          { label: "Projects Completed", value: "500+" },
+          { label: "Happy Clients", value: "150+" },
+          { label: "Team Experts", value: "50+" },
+          { label: "Client Satisfaction", value: "99%" },
+        ].map((stat, index, arr) => (
+          <Box
+            key={index}
             sx={{
-              p: 3,
-              height: "100%",
-              boxShadow: 3,
-              borderRadius: "12px",
-              transition: "all 0.3s ease",
-              "&:hover": {
-                transform: "translateY(-4px)",
-                boxShadow: 6,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              px: 2,
+              textAlign: "center",
+              borderRight: index !== arr.length - 1 ? "1px solid #e0e0e0" : "none",
+              minWidth: 100,
+              flex: 1,
+              "@media (max-width: 690px)": {
+                flexBasis: "48%",
+                borderRight: "none",
               },
-              background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-              color: "white",
+              "@media (max-width: 550px)": { flexBasis: "100%" },
             }}
           >
-            <Box display="flex" alignItems="center" gap={2} mb={2}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: "12px",
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "24px",
-                }}
-              >
-
-              </Box>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontFamily: "SemiBold_W",
-                  fontSize: "18px",
-                }}
-              >
-                Expert Team
-              </Typography>
-            </Box>
             <Typography
-              variant="body2"
               sx={{
-                fontFamily: "Regular_W",
-                fontSize: "14px",
-                opacity: 0.9,
-                lineHeight: 1.6,
+                fontSize: "24px",
+                fontWeight: "bold",
+                color: "var(--webprimary)",
+                fontFamily: "SemiBold_W",
               }}
             >
-              Our skilled professionals bring years of experience and
-              cutting-edge expertise.
+              {stat.value}
             </Typography>
-          </Card>
-
-          {/* Advantage 3: 24/7 Support */}
-          <Card
-            sx={{
-              p: 3,
-              height: "100%",
-              boxShadow: 3,
-              borderRadius: "12px",
-              transition: "all 0.3s ease",
-              "&:hover": {
-                transform: "translateY(-4px)",
-                boxShadow: 6,
-              },
-              background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-              color: "white",
-            }}
-          >
-            <Box display="flex" alignItems="center" gap={2} mb={2}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: "12px",
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "24px",
-                }}
-              >
-                🛠️
-              </Box>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontFamily: "SemiBold_W",
-                  fontSize: "18px",
-                }}
-              >
-                24/7 Support
-              </Typography>
-            </Box>
             <Typography
-              variant="body2"
               sx={{
-                fontFamily: "Regular_W",
                 fontSize: "14px",
-                opacity: 0.9,
-                lineHeight: 1.6,
+                fontWeight: 500,
+                color: "#333",
+                fontFamily: "Regular_W",
               }}
             >
-              Round-the-clock technical support to ensure your business runs
-              smoothly.
+              {stat.label}
             </Typography>
-          </Card>
+          </Box>
+        ))}
+      </Box>
 
-          {/* Advantage 4: Cost-Effective Solutions */}
-          <Card
-            sx={{
-              p: 3,
-              height: "100%",
-              boxShadow: 3,
-              borderRadius: "12px",
-              transition: "all 0.3s ease",
-              "&:hover": {
-                transform: "translateY(-4px)",
-                boxShadow: 6,
-              },
-              background: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-              color: "white",
-            }}
-          >
-            <Box display="flex" alignItems="center" gap={2} mb={2}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: "12px",
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "24px",
-                }}
-              >
-                💰
-              </Box>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontFamily: "SemiBold_W",
-                  fontSize: "18px",
-                }}
-              >
-                Cost-Effective
-              </Typography>
-            </Box>
-            <Typography
-              variant="body2"
-              sx={{
-                fontFamily: "Regular_W",
-                fontSize: "14px",
-                opacity: 0.9,
-                lineHeight: 1.6,
-              }}
-            >
-              Premium quality services at competitive prices that fit your
-              budget.
-            </Typography>
-          </Card>
-
-          {/* Advantage 5: Latest Technology */}
-          <Card
-            sx={{
-              p: 3,
-              height: "100%",
-              boxShadow: 3,
-              borderRadius: "12px",
-              transition: "all 0.3s ease",
-              "&:hover": {
-                transform: "translateY(-4px)",
-                boxShadow: 6,
-              },
-              background: "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
-              color: "#333",
-            }}
-          >
-            <Box display="flex" alignItems="center" gap={2} mb={2}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: "12px",
-                  backgroundColor: "rgba(0,0,0,0.1)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "24px",
-                }}
-              >
-                🚀
-              </Box>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontFamily: "SemiBold_W",
-                  fontSize: "18px",
-                }}
-              >
-                Latest Technology
-              </Typography>
-            </Box>
-            <Typography
-              variant="body2"
-              sx={{
-                fontFamily: "Regular_W",
-                fontSize: "14px",
-                opacity: 0.8,
-                lineHeight: 1.6,
-              }}
-            >
-              We use cutting-edge tools and frameworks to build future-ready
-              solutions.
-            </Typography>
-          </Card>
-
-          {/* Advantage 6: Scalable Solutions */}
-          <Card
-            sx={{
-              p: 3,
-              height: "100%",
-              boxShadow: 3,
-              borderRadius: "12px",
-              transition: "all 0.3s ease",
-              "&:hover": {
-                transform: "translateY(-4px)",
-                boxShadow: 6,
-              },
-              background: "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)",
-              color: "#333",
-            }}
-          >
-            <Box display="flex" alignItems="center" gap={2} mb={2}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: "12px",
-                  backgroundColor: "rgba(0,0,0,0.1)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "24px",
-                }}
-              >
-                📈
-              </Box>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontFamily: "SemiBold_W",
-                  fontSize: "18px",
-                }}
-              >
-                Scalable Solutions
-              </Typography>
-            </Box>
-            <Typography
-              variant="body2"
-              sx={{
-                fontFamily: "Regular_W",
-                fontSize: "14px",
-                opacity: 0.8,
-                lineHeight: 1.6,
-              }}
-            >
-              Our solutions grow with your business, adapting to your evolving
-              needs.
-            </Typography>
-          </Card>
+      {/* Contact CTA */}
+      <Box
+        sx={{
+          backgroundColor: "var(--weblight)",
+          borderRadius: "10px",
+          p: 4,
+          textAlign: "center",
+          border: "1px solid #e0e0e0",
+        }}
+      >
+        <Typography
+          sx={{
+            fontFamily: "SemiBold_W",
+            fontSize: "20px",
+            mb: 1,
+          }}
+        >
+          Ready to Transform Your Business?
+        </Typography>
+        <Typography
+          sx={{
+            fontFamily: "Regular_W",
+            fontSize: "14px",
+            color: "#666",
+            mb: 3,
+          }}
+        >
+          Let's discuss your project and find the perfect solution for your needs
+        </Typography>
+        <Box
+          component="a"
+          href="/#/contact"
+          sx={{
+            display: "inline-block",
+            background: "var(--webprimary)",
+            color: "#fff",
+            padding: "12px 28px",
+            borderRadius: "6px",
+            fontFamily: "Medium_W",
+            fontSize: "14px",
+            textDecoration: "none",
+            transition: "all 0.3s ease",
+            "&:hover": {
+              opacity: 0.9,
+            },
+          }}
+        >
+          Contact Us Today
         </Box>
       </Box>
     </Box>

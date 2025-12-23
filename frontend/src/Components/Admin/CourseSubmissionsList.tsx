@@ -472,7 +472,7 @@ const CourseSubmissionsList = () => {
                                                 "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "12px" }
                                             }}
                                         >
-                                            <MenuItem value="course-material">📚 Course Material</MenuItem>
+                                            <MenuItem value="course-material"> Course Material</MenuItem>
                                             <MenuItem value="assignment">📝 Assignment</MenuItem>
                                             <MenuItem value="video">🎬 Video</MenuItem>
                                             <MenuItem value="notes">📄 Notes</MenuItem>

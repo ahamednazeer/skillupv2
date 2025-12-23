@@ -122,47 +122,47 @@ const WebCategory = () => {
     resolver: zodResolver(carrersWebSchema),
   });
   const { mutate: categoryMutation } = useCategoryMail();
-const onsubmit = async (data: any) => {
-  setLoading(true);
+  const onsubmit = async (data: any) => {
+    setLoading(true);
 
-  if (selectedJob) {
-    const submissionData = {
-      ...data,
-      categoryId: selectedJob.id,
-      categoryTitle: selectedJob.title,
-      category: selectedJob.category,
-    };
+    if (selectedJob) {
+      const submissionData = {
+        ...data,
+        categoryId: selectedJob.id,
+        categoryTitle: selectedJob.title,
+        category: selectedJob.category,
+      };
 
-    // Prepare EmailJS parameters
-    const emailParams = {
-      name: submissionData.name,
-      email: submissionData.email,
-      mobile: submissionData.mobile,
-      categoryName: submissionData.categoryTitle,
-      categoryType: submissionData.category,
-      year: new Date().getFullYear(),
-      courseName: "-",
-    };
+      // Prepare EmailJS parameters
+      const emailParams = {
+        name: submissionData.name,
+        email: submissionData.email,
+        mobile: submissionData.mobile,
+        categoryName: submissionData.categoryTitle,
+        categoryType: submissionData.category,
+        year: new Date().getFullYear(),
+        courseName: "-",
+      };
 
-    try {
-      await emailjs.send(
-        "service_xto17zc", 
-        "template_d26jy52",  
-        emailParams,
-        "j0ZYBw2nraPLfCMAv"    
-      );
-      CustomSnackBar.successSnackbar("Email sent successfully!");
-    } catch (error) {
-      console.error("EmailJS error:", error);
-      CustomSnackBar.errorSnackbar("Failed to send email.");
-      setLoading(false);
+      try {
+        await emailjs.send(
+          "service_xto17zc",
+          "template_d26jy52",
+          emailParams,
+          "j0ZYBw2nraPLfCMAv"
+        );
+        CustomSnackBar.successSnackbar("Email sent successfully!");
+      } catch (error) {
+        console.error("EmailJS error:", error);
+        CustomSnackBar.errorSnackbar("Failed to send email.");
+        setLoading(false);
+      }
+      finally {
+        handleClose();
+        setLoading(false);
+      }
     }
-    finally{
-      handleClose();
-      setLoading(false);
-    }
-  }
-};
+  };
 
   const handleOpen = (
     jobTitle: string,
@@ -182,9 +182,9 @@ const onsubmit = async (data: any) => {
       sx={
         location.pathname === "/"
           ? {
-              paddingTop: "60px",
-              "@media (max-width: 768px)": { paddingTop: "40px" },
-            }
+            paddingTop: "60px",
+            "@media (max-width: 768px)": { paddingTop: "40px" },
+          }
           : { padding: "0px" }
       }
     >
@@ -328,8 +328,10 @@ const onsubmit = async (data: any) => {
                 <CardMedia
                   component="img"
                   height="200"
-                  image={`${config.BASE_URL_MAIN}/uploads/${item.image}`}
-                  // image={item.image}
+                  image={item.image
+                    ? `${config.BASE_URL_MAIN}/uploads/${item.image}`
+                    : 'https://placehold.co/400x200/f5f5f5/999999?text=No+Image'
+                  }
                   alt={item.title}
                 />
                 <CardContent>

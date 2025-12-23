@@ -35,7 +35,7 @@ const ProgramsManagement = () => {
         <Box sx={{ p: 3 }}>
             {/* Header */}
             <Typography variant="h5" fontWeight="bold" sx={{ mb: 3 }}>
-                📚 Program Management
+                Program Management
             </Typography>
 
             {/* Main Tabs */}

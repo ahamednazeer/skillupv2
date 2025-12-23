@@ -2,6 +2,9 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
+const helmet = require("helmet");
+const compression = require("compression");
+const morgan = require("morgan");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./swagger_output.json");
 const connectDB = require("./config/db");
@@ -35,13 +38,46 @@ const sendCourseMail = require("./utils/sendCourseMail");
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// Security & Performance Middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(compression());
+
+// Logging
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
+}
+
+// CORS Config - support multiple origins for development
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173'
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    // In development, allow all localhost origins
+    if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 
-// Security middleware
-const securityHeaders = require('./middleware/securityHeaders');
 const { generalLimiter } = require('./middleware/rateLimit');
-app.use(securityHeaders);
 app.use('/api', generalLimiter);
 
 // Health check endpoint
@@ -59,8 +95,13 @@ connectDB();
 // Serve static files from uploads directory
 // Serve static files from uploads directory (with B2 fallback)
 // app.use('/uploads', express.static('uploads'));
-// Serve static files from uploads directory (with B2 fallback)
-app.use('/uploads', express.static('uploads'), async (req, res, next) => {
+// Serve static files from uploads directory (with B2 fallback + caching)
+app.use('/uploads', express.static('uploads', {
+  maxAge: '7d',          // 7 days cache for production
+  etag: true,            // Enable ETag for cache validation
+  lastModified: true,    // Enable Last-Modified header
+  immutable: false       // Files may be updated
+}), async (req, res, next) => {
   // If we are here, express.static didn't find the file (or it's a directory).
   // Check if it looks like a file request.
   if (req.method !== 'GET') return next();
@@ -76,13 +117,29 @@ app.use('/uploads', express.static('uploads'), async (req, res, next) => {
     // Decode URI component in case of spaces etc
     const decodedFilename = decodeURIComponent(filename);
 
-    console.log(`[B2 Fallback] Attempting to find signed URL for: ${decodedFilename}`);
+    console.log(`[B2 Fallback] Attempting to fetch from B2: ${decodedFilename}`);
     const signedUrl = await b2Service.getSignedUrl(decodedFilename);
-    res.redirect(signedUrl);
+
+    // Proxy the file instead of redirect to avoid CORS issues
+    const fetch = require('node-fetch');
+    const b2Response = await fetch(signedUrl);
+
+    if (!b2Response.ok) {
+      console.warn(`[B2 Fallback] B2 returned ${b2Response.status} for ${decodedFilename}`);
+      return res.status(404).send("File not found");
+    }
+
+    // Forward content-type and set cache headers
+    const contentType = b2Response.headers.get('content-type');
+    if (contentType) {
+      res.set('Content-Type', contentType);
+    }
+    res.set('Cache-Control', 'public, max-age=604800'); // 7 days
+
+    // Stream the response body to client
+    b2Response.body.pipe(res);
   } catch (err) {
     console.warn(`[B2 Fallback] Failed for ${req.path}:`, err.message);
-    // Prepare 404 response or let default errorHandler handle it?
-    // User expects image or 404.
     res.status(404).send("File not found");
   }
 });
@@ -115,13 +172,8 @@ app.use("/api", categoryMailRoutes);
 const PORT = process.env.PORT || 5000;
 
 // Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-  });
-});
+const errorHandler = require("./middleware/errorHandler");
+app.use(errorHandler);
 
 // 404 handler
 app.use('*', (req, res) => {

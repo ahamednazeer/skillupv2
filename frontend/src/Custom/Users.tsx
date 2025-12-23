@@ -1,4 +1,4 @@
-import { DataGrid, GridColDef } from "@mui/x-data-grid";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import {
   Box,
   IconButton,
@@ -213,7 +213,7 @@ const AssignmentModal = ({ open, onClose, student }: { open: boolean; onClose: (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
           <Box sx={{ display: "flex", gap: 1 }}>
             {[
-              { type: "course", icon: "📚", label: "Course" },
+              { type: "course", icon: "", label: "Course" },
               { type: "internship", icon: "💼", label: "Internship" },
               { type: "project", icon: "🎯", label: "Project" }
             ].map(({ type, icon, label }) => (
@@ -303,8 +303,8 @@ const Users = () => {
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    if (getUsersResponse) {
-      setRows(getUsersResponse);
+    if (getUsersResponse?.data) {
+      setRows(getUsersResponse.data);
     }
   }, [getUsersResponse]);
 

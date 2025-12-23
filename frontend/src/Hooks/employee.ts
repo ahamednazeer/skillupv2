@@ -1,13 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
-import Cookies from "js-cookie";
+import api from "../Interceptors/Interceptor";
 
-const BASE_URL = import.meta.env.VITE_APP_BASE_URL;
-
-const getAuthHeader = () => {
-    const token = Cookies.get("skToken");
-    return { headers: { Authorization: `Bearer ${token}` } };
-};
+// Using the api interceptor which handles token refresh automatically
+// No need for manual auth headers - the interceptor adds them
 
 // --- Employee Hooks ---
 
@@ -15,7 +10,7 @@ export const useGetEmployees = () => {
     return useQuery({
         queryKey: ["employees"],
         queryFn: async () => {
-            const response = await axios.get(`${BASE_URL}admin/employees`, getAuthHeader());
+            const response = await api.get("admin/employees");
             return response.data;
         },
     });
@@ -25,7 +20,7 @@ export const useGetEmployeeById = (id: string) => {
     return useQuery({
         queryKey: ["employee", id],
         queryFn: async () => {
-            const response = await axios.get(`${BASE_URL}admin/employees/${id}`, getAuthHeader());
+            const response = await api.get(`admin/employees/${id}`);
             return response.data;
         },
         enabled: !!id,
@@ -36,7 +31,7 @@ export const useCreateEmployee = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async (data: any) => {
-            const response = await axios.post(`${BASE_URL}admin/employees`, data, getAuthHeader());
+            const response = await api.post("admin/employees", data);
             return response.data;
         },
         onSuccess: () => {
@@ -49,10 +44,10 @@ export const useUpdateEmployeeProfile = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async ({ id, data }: { id: string; data: any }) => {
-            const response = await axios.put(`${BASE_URL}admin/employees/${id}`, data, getAuthHeader());
+            const response = await api.put(`admin/employees/${id}`, data);
             return response.data;
         },
-        onSuccess: (data, variables) => {
+        onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ["employees"] });
             queryClient.invalidateQueries({ queryKey: ["employee", variables.id] });
         },
@@ -63,10 +58,10 @@ export const useUpdateSalaryStructure = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async ({ id, data }: { id: string; data: any }) => {
-            const response = await axios.post(`${BASE_URL}admin/employees/${id}/salary`, data, getAuthHeader());
+            const response = await api.post(`admin/employees/${id}/salary`, data);
             return response.data;
         },
-        onSuccess: (data, variables) => {
+        onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ["employee", variables.id] });
         },
     });
@@ -77,7 +72,7 @@ export const useUpdateSalaryStructure = () => {
 export const useGeneratePayslip = () => {
     return useMutation({
         mutationFn: async (data: any) => {
-            const response = await axios.post(`${BASE_URL}admin/payroll/generate`, data, getAuthHeader());
+            const response = await api.post("admin/payroll/generate", data);
             return response.data;
         },
     });
@@ -92,7 +87,7 @@ export const useGetPayslipHistory = (month?: string, year?: string, employeeId?:
             if (year) params.append("year", year);
             if (employeeId) params.append("employeeId", employeeId);
 
-            const response = await axios.get(`${BASE_URL}admin/payroll/history?${params.toString()}`, getAuthHeader());
+            const response = await api.get(`admin/payroll/history?${params.toString()}`);
             return response.data;
         },
     });
@@ -101,7 +96,7 @@ export const useGetPayslipHistory = (month?: string, year?: string, employeeId?:
 export const useSendPayslipEmail = () => {
     return useMutation({
         mutationFn: async (data: { payslipId: string; type: string }) => {
-            const response = await axios.post(`${BASE_URL}admin/payroll/send-email`, data, getAuthHeader());
+            const response = await api.post("admin/payroll/send-email", data);
             return response.data;
         },
     });
@@ -111,7 +106,7 @@ export const useGetPayrollSettings = () => {
     return useQuery({
         queryKey: ["payrollSettings"],
         queryFn: async () => {
-            const response = await axios.get(`${BASE_URL}admin/payroll/settings`, getAuthHeader());
+            const response = await api.get("admin/payroll/settings");
             return response.data;
         },
     });
@@ -121,7 +116,7 @@ export const useUpdatePayrollSettings = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async (data: any) => {
-            const response = await axios.put(`${BASE_URL}admin/payroll/settings`, data, getAuthHeader());
+            const response = await api.put("admin/payroll/settings", data);
             return response.data;
         },
         onSuccess: () => {
@@ -136,7 +131,7 @@ export const useGetMyPayslips = () => {
     return useQuery({
         queryKey: ["myPayslips"],
         queryFn: async () => {
-            const response = await axios.get(`${BASE_URL}employee/payslips`, getAuthHeader());
+            const response = await api.get("employee/payslips");
             return response.data;
         },
     });

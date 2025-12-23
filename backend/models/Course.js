@@ -91,4 +91,7 @@ CourseSchema.pre('save', function (next) {
     next();
 });
 
+// Indexes
+CourseSchema.index({ status: 1 });
+
 module.exports = mongoose.model("Course", CourseSchema);

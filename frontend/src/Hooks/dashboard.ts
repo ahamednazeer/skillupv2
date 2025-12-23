@@ -20,7 +20,7 @@ export const useGetDashboardCountsApi = (monthYear?: string) => {
           ? `${apiUrls.dashboardCounts}/${monthYear}`
           : apiUrls.dashboardCounts;
         const response = await callApi(url, "GET");
-        return response as ApiResponse<DashboardCounts>;
+        return (response as ApiResponse<DashboardCounts>).data;
       } catch (error) {
         throw error;
       }

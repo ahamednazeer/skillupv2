@@ -27,6 +27,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import type { TooltipItem } from "chart.js";
 import { Bar } from "react-chartjs-2";
 
 // Register Chart.js components
@@ -105,7 +106,7 @@ const AdminDashboard = () => {
       tooltip: {
         enabled: true,
         callbacks: {
-          label: function (context) {
+          label: function (context: TooltipItem<"bar">) {
             return `Count: ${context.raw}`;
           },
         },

@@ -329,7 +329,7 @@ const InternshipSubmissionsList = () => {
                                             onChange={(e) => handleFileTypeChange(index, e.target.value)}
                                             sx={{ width: 140, "& .MuiInputBase-root": { fontFamily: "Regular_W", fontSize: "12px" } }}
                                         >
-                                            <MenuItem value="learning-material">📚 Learning Material</MenuItem>
+                                            <MenuItem value="learning-material"> Learning Material</MenuItem>
                                             <MenuItem value="task">📝 Task</MenuItem>
                                             <MenuItem value="video">🎬 Video</MenuItem>
                                             <MenuItem value="notes">📄 Notes</MenuItem>

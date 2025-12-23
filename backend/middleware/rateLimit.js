@@ -14,8 +14,8 @@ const loginLimiter = rateLimit({
         retryAfter: '15 minutes'
     },
     standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req) => req.ip || req.connection.remoteAddress
+    legacyHeaders: false
+    // Default keyGenerator handles IPv6 properly
 });
 
 // Forgot password rate limiter - 3 attempts per 15 minutes
@@ -27,8 +27,8 @@ const forgotPasswordLimiter = rateLimit({
         retryAfter: '15 minutes'
     },
     standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req) => req.ip || req.connection.remoteAddress
+    legacyHeaders: false
+    // Default keyGenerator handles IPv6 properly
 });
 
 // General API rate limiter - 300 requests per 5 minutes
@@ -52,3 +52,4 @@ module.exports = {
     forgotPasswordLimiter,
     generalLimiter
 };
+

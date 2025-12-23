@@ -5,27 +5,21 @@ const crypto = require("crypto");
 const sendOtpEmail = require("../utils/sendOtpMail");
 const sendPasswordMail = require("../utils/sendPasswordMail");
 const { sendResetPasswordMail } = require("../utils/sendResetMail");
+const { validateName, validateEmail, validateMobile } = require("../utils/validation");
 
 const otpStore = new Map();
 
 exports.register = async (req, res) => {
   const { name, email, mobile } = req.body;
 
-  if (!name || !email || !mobile) {
-    return res.status(400).json({ message: "Please fill in all fields" });
-  }
+  const nameError = validateName(name);
+  if (nameError) return res.status(400).json({ message: nameError });
 
-  if (name.length < 3) {
-    return res.status(400).json({ message: "Name must be at least 3 characters long" });
-  }
+  const emailError = validateEmail(email);
+  if (emailError) return res.status(400).json({ message: emailError });
 
-  if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(email)) {
-    return res.status(400).json({ message: "Invalid Email Address" });
-  }
-
-  if (!/^\d{10}$/.test(mobile)) {
-    return res.status(400).json({ message: "Mobile number must be exactly 10 digits" });
-  }
+  const mobileError = validateMobile(mobile);
+  if (mobileError) return res.status(400).json({ message: mobileError });
 
   try {
     const userExist = await User.findOne({ email });
@@ -220,13 +214,8 @@ exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
 
   // Validate email
-  if (!email) {
-    return res.status(400).json({ message: "Email is required" });
-  }
-
-  if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(email)) {
-    return res.status(400).json({ message: "Invalid Email Address" });
-  }
+  const emailError = validateEmail(email);
+  if (emailError) return res.status(400).json({ message: emailError });
 
   try {
     // Check if user exists

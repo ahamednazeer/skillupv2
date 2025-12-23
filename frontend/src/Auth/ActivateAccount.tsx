@@ -106,7 +106,7 @@ const ActivateAccount = () => {
             <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", flexDirection: "column", gap: 2 }}>
                 <Typography variant="h5" color="error">Invalid Activation Link</Typography>
                 <Typography>No activation token found in the URL.</Typography>
-                <CustomButton label="Go to Login" onClick={() => navigate("/login")} />
+                <CustomButton type="button" label="Go to Login" onClick={() => navigate("/login")} />
             </Box>
         );
     }
@@ -125,7 +125,7 @@ const ActivateAccount = () => {
             <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", flexDirection: "column", gap: 2 }}>
                 <Typography variant="h5" color="error">Invalid or Expired Link</Typography>
                 <Typography>This activation link is no longer valid. Please contact admin for a new invite.</Typography>
-                <CustomButton label="Go to Login" onClick={() => navigate("/login")} />
+                <CustomButton type="button" label="Go to Login" onClick={() => navigate("/login")} />
             </Box>
         );
     }

@@ -64,7 +64,7 @@ const serviceDetails: Record<
         textColor: "white",
       },
       {
-        icon: "📋",
+        icon: "",
         title: "Training Certificate",
         desc: "Receive official certification to validate your industrial training",
         gradient: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
@@ -184,7 +184,7 @@ const serviceDetails: Record<
         textColor: "white",
       },
       {
-        icon: "📚",
+        icon: "",
         title: "Professional Documentation",
         desc: "Create industry-standard documentation including reports and technical specifications",
         gradient: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",

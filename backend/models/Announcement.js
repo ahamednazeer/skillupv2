@@ -44,4 +44,7 @@ announcementSchema.pre('save', function (next) {
     next();
 });
 
+// Indexes
+announcementSchema.index({ isActive: 1, targetAudience: 1 });
+
 module.exports = mongoose.model("Announcement", announcementSchema);

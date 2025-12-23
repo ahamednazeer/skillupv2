@@ -19,6 +19,9 @@ const securityHeaders = (req, res, next) => {
     // Permissions policy (formerly Feature-Policy)
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
+    // Allow cross-origin resource loading (fixes CORP errors for images/files)
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
     // Only add HSTS in production (requires HTTPS)
     if (process.env.NODE_ENV === 'production') {
         res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

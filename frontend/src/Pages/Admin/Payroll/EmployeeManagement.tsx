@@ -80,7 +80,7 @@ const AddEmployeeModal = ({ open, onClose }: { open: boolean; onClose: () => voi
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5, mt: 2 }}>
                     {/* Basic Info Section */}
                     <Typography variant="subtitle2" color="text.secondary" sx={{ mb: -1 }}>
-                        📋 Basic Information
+                        Basic Information
                     </Typography>
                     <Box sx={{ display: "flex", gap: 2 }}>
                         <TextField
